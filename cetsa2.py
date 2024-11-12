@@ -26,7 +26,7 @@ warnlogname = str(cetsa_paths.get_logging_path('cetsa_debug.log'))
 logging.basicConfig(filename=warnlogname, level=logging.DEBUG)
 logging.captureWarnings(True)
 
-from sklearn.preprocessing import PolynomialFeatures
+#from sklearn.preprocessing import PolynomialFeatures
 import seaborn
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
