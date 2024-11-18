@@ -11,23 +11,24 @@ from tkinter import filedialog
 
 import cetsa_paths
 
-class FilenameOpenChooser(tk.Frame):
+
+class FsChooser(tk.Frame):
     
-    def __init__(self, master, name: str, textvariable, defaultpath=None):
+    def __init__(self, master, name: str, textvariable, command, kind="filename", defaultpath=None):
         tk.Frame.__init__(self, master)
-        
+        self.command = command
         self.textvariable = textvariable
         self.defaultpath = defaultpath
         self.label = ttk.Label(self,
-                               text=f"Input {name} filename")
+                               text=f"Input {name} {kind}")
         self.entry = ttk.Entry(self, 
                                textvariable=textvariable)
         self.button = ttk.Button(self, 
                                  command=self.choose, 
-                                 text=f"Choose {name} filename")
+                                 text=f"Choose {name} {kind}")
         self.reset = ttk.Button(self,
                                  command=self.default,
-                                 text=f"Default {name} filename")
+                                 text=f"Default {name} {kind}")
         self.label.grid(row=0, column=0)
         self.entry.grid(row=0, column=1)
         self.button.grid(row=1, column=0)
@@ -35,7 +36,7 @@ class FilenameOpenChooser(tk.Frame):
         
     
     def choose(self):
-        filepath = filedialog.askopenfilename()
+        filepath = self.command()
         self.textvariable.set(filepath)
         
     def default(self):
@@ -46,6 +47,34 @@ class FilenameOpenChooser(tk.Frame):
     
     def get(self):
         return self.textvariable.get()
+
+
+class FolderOpenChooser(FsChooser):
+    
+    def __init__(self, 
+                 master, 
+                 name: str, 
+                 textvariable, 
+                 command=filedialog.askdirectory, 
+                 kind="folder", 
+                 defaultpath=None):
+        super().__init__(master, name, textvariable, command, kind, defaultpath)
+
+
+
+
+
+class FilenameOpenChooser(FsChooser):
+    
+    def __init__(self, 
+                 master, 
+                 name: str, 
+                 textvariable, 
+                 command=filedialog.askopenfilename, 
+                 kind="file", 
+                 defaultpath=None):
+        super().__init__(master, name, textvariable, command, kind, defaultpath)
+        
 
 
 class MethodChooser(tk.Frame):
@@ -82,6 +111,8 @@ class MethodChooser(tk.Frame):
 
 window = tk.Tk(screenName="CETSA Pipeline")
 
+window.title("CETSA Pipelines")
+
 approach = tk.IntVar(value=MethodChooser.NOT_SET)
 
 method_choose = MethodChooser(window, approach)
@@ -90,20 +121,34 @@ candidate_filepath = tk.StringVar()
 
 data_filepath = tk.StringVar()
 
+outdir_filepath = tk.StringVar()
+
 candidate_ask = FilenameOpenChooser(window, 
                                     "Candidate", 
                                     candidate_filepath,
-                                    cetsa_paths.get_candidates_filepath(False))
+                                    defaultpath=cetsa_paths.get_candidates_filepath(False))
 
 data_ask = FilenameOpenChooser(window,
                                "Data",
                                data_filepath,
-                               cetsa_paths.get_data_filepath(False))
+                               defaultpath=cetsa_paths.get_data_filepath(False))
+
+out_ask = FolderOpenChooser(window,
+                            "Output",
+                            outdir_filepath,
+                            defaultpath=str(cetsa_paths.get_outdir())
+                            )
+
+quit_but = ttk.Button(window, command=window.destroy, text="Quit")
 
 candidate_ask.pack()
 data_ask.pack()
+out_ask.pack()
 method_choose.pack()
+quit_but.pack()
 
 window.mainloop()
 
 print(candidate_filepath.get())
+print(data_filepath.get())
+print(approach.get())

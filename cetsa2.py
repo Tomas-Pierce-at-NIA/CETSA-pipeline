@@ -302,8 +302,8 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None):
             pdf.savefig(fig)
             ax.cla()     
 
-def main():
-    data, candidates = load.prepare_data(False)
+def main(datapath=None, candidatepath=None):
+    data, candidates = load.prepare_data(False, data_path=datapath, candidate_path=candidatepath)
     # we will reload the candidates when we need them later
     del candidates
     narrow_data = data.loc[:, ['PG.ProteinAccessions',

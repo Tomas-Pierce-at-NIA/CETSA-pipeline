@@ -588,5 +588,5 @@ if __name__ == '__main__':
     
     data, candidates = load.prepare_data(False)
     stud_fis, stud_quer = run_analysis(data, candidates, method='student')
-    dun_fis, dun_quer = run_analysis(data, candidates, method='dunnett')
+    #dun_fis, dun_quer = run_analysis(data, candidates, method='dunnett')
 
