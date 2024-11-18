@@ -418,9 +418,10 @@ def auc_all_proteins(data):
     return frame
 
 
-def run_analysis(data, candidates, method='dunnett'):
+def run_analysis(data, candidates, method='dunnett', datadir=None):
     
-    datadir = cetsa_paths.get_outdir()
+    if datadir is None:
+        datadir = cetsa_paths.get_outdir()
     
     if method == 'dunnett':
         dunnetts = get_all_dunnett_tests(data)

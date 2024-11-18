@@ -9,7 +9,13 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 
+from pathlib import Path
+
+import threading
+
 import cetsa_paths
+import CETSA_individual_temperature as ita
+import load_monocyte_cetsa_data as load
 
 
 class FsChooser(tk.Frame):
@@ -109,46 +115,103 @@ class MethodChooser(tk.Frame):
         return self.variable.get()
 
 
-window = tk.Tk(screenName="CETSA Pipeline")
+def run(method, datapath, candidatepath, outpath):
+    
+    datafile = Path(datapath)
+    candidatefile = Path(candidatepath)
+    outdir = Path(outpath)
+    
+    if method == MethodChooser.NOT_SET:
+        print("no method set")
+        return
+    
+    elif method == MethodChooser.COMBO_T_TEST:
+        data, candidates = load.prepare_data(False, datafile, candidatefile)
+        ita.run_analysis(data, candidates, 'student', datadir=outdir)
+        return
+    
+    elif method == MethodChooser.NPARC:
+        return
+    
+    else:
+        print("unknown method set : {}".format(method))
+        return
 
-window.title("CETSA Pipelines")
 
-approach = tk.IntVar(value=MethodChooser.NOT_SET)
+def ui():
 
-method_choose = MethodChooser(window, approach)
+    window = tk.Tk(screenName="CETSA Pipeline")
+    
+    window.title("CETSA Pipelines")
+    
+    approach = tk.IntVar(value=MethodChooser.NOT_SET)
+    
+    method_choose = MethodChooser(window, approach)
+    
+    candidate_filepath = tk.StringVar()
+    
+    data_filepath = tk.StringVar()
+    
+    outdir_filepath = tk.StringVar()
+    
+    def showdata():
+        print(approach.get())
+        print(candidate_filepath.get())
+        print(data_filepath.get())
+        print(outdir_filepath.get())
+    
+    candidate_ask = FilenameOpenChooser(window, 
+                                        "Candidate", 
+                                        candidate_filepath,
+                                        defaultpath=cetsa_paths.get_candidates_filepath(False))
+    
+    data_ask = FilenameOpenChooser(window,
+                                   "Data",
+                                   data_filepath,
+                                   defaultpath=cetsa_paths.get_data_filepath(False))
+    
+    out_ask = FolderOpenChooser(window,
+                                "Output",
+                                outdir_filepath,
+                                defaultpath=str(cetsa_paths.get_outdir())
+                                )
+    
+    quit_but = ttk.Button(window, command=window.destroy, text="Quit")
+    
+    debug_but = ttk.Button(window, command=showdata, text="Debug")
+    
+    def invoke():
+        method = approach.get()
+        candidatepath = candidate_filepath.get()
+        datapath = data_filepath.get()
+        outdir = outdir_filepath.get()
+        thread = threading.Thread(target=run, args=(method, datapath, candidatepath, outdir))
+        thread.start()
+        return thread
+    
+    threads = []
+    
+    run_but = ttk.Button(window, 
+                         command=lambda:run(approach.get(),
+                                            data_filepath.get(),
+                                            candidate_filepath.get(),
+                                            outdir_filepath.get()),
+                         text="Run")
+    
+    candidate_ask.pack()
+    data_ask.pack()
+    out_ask.pack()
+    method_choose.pack()
+    run_but.pack()
+    debug_but.pack()
+    quit_but.pack()
+    
+    window.mainloop()
+    
+    for thread in threads:
+        thread.join()
 
-candidate_filepath = tk.StringVar()
 
-data_filepath = tk.StringVar()
+if __name__ == '__main__':
+    ui()
 
-outdir_filepath = tk.StringVar()
-
-candidate_ask = FilenameOpenChooser(window, 
-                                    "Candidate", 
-                                    candidate_filepath,
-                                    defaultpath=cetsa_paths.get_candidates_filepath(False))
-
-data_ask = FilenameOpenChooser(window,
-                               "Data",
-                               data_filepath,
-                               defaultpath=cetsa_paths.get_data_filepath(False))
-
-out_ask = FolderOpenChooser(window,
-                            "Output",
-                            outdir_filepath,
-                            defaultpath=str(cetsa_paths.get_outdir())
-                            )
-
-quit_but = ttk.Button(window, command=window.destroy, text="Quit")
-
-candidate_ask.pack()
-data_ask.pack()
-out_ask.pack()
-method_choose.pack()
-quit_but.pack()
-
-window.mainloop()
-
-print(candidate_filepath.get())
-print(data_filepath.get())
-print(approach.get())

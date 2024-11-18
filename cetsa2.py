@@ -302,7 +302,7 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None):
             pdf.savefig(fig)
             ax.cla()     
 
-def main(datapath=None, candidatepath=None):
+def main(datapath=None, candidatepath=None, outdir=None):
     data, candidates = load.prepare_data(False, data_path=datapath, candidate_path=candidatepath)
     # we will reload the candidates when we need them later
     del candidates
@@ -381,7 +381,8 @@ def main(datapath=None, candidatepath=None):
                                  'Treatment 1',
                                  'Treatment 2'])
     
-    outdir = cetsa_paths.get_outdir()
+    if outdir is None:
+        outdir = cetsa_paths.get_outdir()
     
     outpath = outdir / 'nparc_outputs_Oct2024.csv'
     
