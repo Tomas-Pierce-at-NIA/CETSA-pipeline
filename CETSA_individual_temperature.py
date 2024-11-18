@@ -20,7 +20,20 @@ import load_monocyte_cetsa_data as load
 import cetsa_paths
 
 
-def get_all_student_tests(data):
+def get_all_student_tests(data: pandas.DataFrame) -> pandas.DataFrame:
+    """
+    Takes as input the normalized data of a CETSA experiment
+    such that the treatment, temperature, and relative soluble fraction
+    of each sample is known.
+    Runs T-tests at each temperature between each pair of conditions
+    for every protein identified in the data,
+    excepting comparisons between treatment conditions,
+    where the treatments are determined from data and the controls
+    are hard-coded to be DMSO and Myricetin.
+    
+    Returns a datatable describing the results of the T-test for each
+    protein-temperature-treatment-control combination.
+    """
     conditions = set(data['Treatment'])
     controls = {'DMSO', 'Myricetin'}
     treatments = list(conditions.difference(controls))
@@ -36,6 +49,8 @@ def get_all_student_tests(data):
         for temp, subtable in temp_gs:
             for treatment in treatments:
                 for control in controls:
+                    if treatment == control:
+                        continue
                     treat_sample = subtable.loc[subtable['Treatment'] == treatment, NORMPROT]
                     control_sample = subtable.loc[subtable['Treatment'] == control, NORMPROT]
                     t_test = stats.ttest_ind(treat_sample, control_sample)
@@ -63,12 +78,30 @@ def get_all_student_tests(data):
 
 
 def calc_fisher_statistic(pvals):
+    """
+    Calculates test statistic for combinations of pvalues that is
+    -2 * sum(log(p-values)) 
+    as used by Brown's method for combination p-values
+    for a collection of p-values
+    """
     return -2 * np.sum(np.log(pvals))
 
 def get_chi_mean(cov_mtx):
+    """
+    Calculate mean of a chi-squared variable 
+    that would be consistent with the input
+    covariance matrix
+    as used in Brown's method for combination of non-independent p-values
+    """
     return 2 * len(cov_mtx)
 
 def get_chi_variance(cov_mtx):
+    """
+    Calculate variance of a chi-squared variable
+    that would be consistent with the input 
+    covariance matrix
+    as used in Brown's method for combination of non-independent p-values
+    """
     k_conds = len(cov_mtx)
     cov_total = 0
     for i in range(cov_mtx.shape[0]):
@@ -77,9 +110,25 @@ def get_chi_variance(cov_mtx):
     return (4 * k_conds) + (2 * cov_total)
 
 def get_p_value(deg_free, scale_param, fisher_stat):
+    """
+    Calculate combination p-value using a Chi-squared variable
+    with the specified parameters and input Fisher statistic
+    ie -2*sum(log(p-values))
+    
+    Used to implement Brown's method for combining non-independent p-values
+    """
     return stats.chi2.sf(fisher_stat, deg_free, scale=scale_param)
 
-def collect_students(students_table):
+def collect_students(students_table: pandas.DataFrame) -> pandas.DataFrame:
+    """
+    Take as input a datatable describing the results of T-tests
+    for
+    protein-temperature-treatment-control
+    and combine the p-values thereof by Brown's method to produce
+    a table of p-values for
+    protein-treatment-control
+    cases.
+    """
     
     students_table.loc[:, 'log_pval'] = np.log(students_table['T-test_pvalue']) * (-2)
     
@@ -131,6 +180,14 @@ def collect_students(students_table):
 
 
 def graph_all_proteins(data, all_comps, focus, filename, treatment, control):
+    """
+    Graph all proteins where the comparison between treatment and control
+    has been detected as significant ( adjusted p < 0.05).
+    Displays line connecting averages at each temperature for treatment
+    and control. Displays scatter dots for individual measurements.
+    Also displays bar graph of individual-temperature p-values beneath
+    x-axis and outputs adjusted p-value in bottom-right corner.
+    """
     
     treatments = ['DMSO', 'Fisetin', 'Quercetin', 'Myricetin']
     
@@ -232,7 +289,14 @@ def graph_all_proteins(data, all_comps, focus, filename, treatment, control):
     return
 
 
-def auc_all_proteins(data):
+def auc_all_proteins(data: pandas.DataFrame) -> pandas.DataFrame:
+    """
+    Calculates change in area under curve between each pair of
+    treatment, control conditions.
+    Currently considered suspect for not being consistent
+    with same approach implemented via Excel.
+    Computes area-under-curve using trapezoidal approximation.
+    """
     
     table = []
     
@@ -319,6 +383,9 @@ def auc_all_proteins(data):
 
 
 def run_analysis(data, candidates, method='dunnett', datadir=None):
+    """
+    Responsible for overall running of individual-temperature based analysis.
+    """
     
     if datadir is None:
         datadir = cetsa_paths.get_outdir()

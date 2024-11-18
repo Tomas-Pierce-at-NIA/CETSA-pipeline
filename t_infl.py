@@ -11,7 +11,7 @@ import sympy
 from nparc_model import NPARCModel
 from typing import Callable
 
-# analytic derivative is numerically expensive,
+# analytic derivative is computationally expensive,
 # so getting it done once and reusing is more efficient
 
 # I have verified this empirically,
