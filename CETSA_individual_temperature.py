@@ -61,60 +61,6 @@ def get_all_student_tests(data):
     return student_frame
 
 
-def get_all_dunnett_tests(data):
-    conditions = set(data['Treatment'])
-    control = 'DMSO'
-    treatments = list(conditions.difference({control}))
-    
-    groups = data.groupby(by=['PG.ProteinAccessions',
-                              'PG.Genes'])
-    
-    dunnet_table = []
-    
-    for ident, table in groups:
-        temp_gs = table.groupby(by=['Temperature'])
-        for temp, subtable in temp_gs:
-            samples = []
-            for treatment in treatments:
-                sample = subtable.loc[subtable['Treatment'] == treatment, NORMPROT]
-                samples.append(sample)
-            control_measures = subtable.loc[subtable['Treatment'] == control, NORMPROT]
-            if len(samples[0]) < 2 or len(samples[1]) < 2 or len(samples[2]) < 2 or len(control_measures) < 2:
-                continue
-            dunnet_res = stats.dunnett(*samples, control=control_measures)
-            dunnet_row0 = (*ident, 
-                           *temp, 
-                           treatments[0], 
-                           control, 
-                           dunnet_res.pvalue[0], 
-                           dunnet_res.statistic[0])
-            dunnet_row1 = (*ident, 
-                           *temp, 
-                           treatments[1], 
-                           control, 
-                           dunnet_res.pvalue[1], 
-                           dunnet_res.statistic[1])
-            dunnet_row2 = (*ident, 
-                           *temp, 
-                           treatments[2], 
-                           control, 
-                           dunnet_res.pvalue[2], 
-                           dunnet_res.statistic[2])
-            dunnet_table.append(dunnet_row0)
-            dunnet_table.append(dunnet_row1)
-            dunnet_table.append(dunnet_row2)
-    
-    dunnetts_frame = pandas.DataFrame(data=dunnet_table,
-                                      columns=['PG.ProteinAccessions',
-                                               'PG.Genes',
-                                               'Temperature',
-                                               'Treatment',
-                                               'Control',
-                                               'dunnetts_pvalue',
-                                               'dunnetts_statistic'])
-    
-    return dunnetts_frame
-
 
 def calc_fisher_statistic(pvals):
     return -2 * np.sum(np.log(pvals))
@@ -182,52 +128,6 @@ def collect_students(students_table):
     return combo_frame
 
 
-def collect_dunnetts(dunnetts_table):
-    combo_d_pvals = []
-    
-    dunnetts_table.loc[:, 'log_pval'] = np.log(dunnetts_table.loc[:,'dunnetts_pvalue']) * (-2)
-    
-    pivot = dunnetts_table.pivot_table(index=["PG.Genes"], 
-                                 columns="Temperature",
-                                 values="log_pval")
-    
-    dunn_cov = pivot.cov()
-    
-    dunn_cov = np.array(dunn_cov)
-    
-    chi_mean = get_chi_mean(dunn_cov)
-    
-    chi_variance = get_chi_variance(dunn_cov)
-    
-    # degrees freedom
-    f = 2 * (chi_mean**2) / chi_variance
-    
-    #scale parameter
-    c = chi_variance / (2 * chi_mean)
-    
-    for specific, subtable in dunnetts_table.groupby(by=['PG.ProteinAccessions',
-                                                         'PG.Genes',
-                                                         'Treatment']):
-        accession, gene, treatment = specific
-        
-        pvals = subtable['dunnetts_pvalue']
-        
-        #combo_res = stats.combine_pvalues(pvals)
-        #combo_pval = stats.hmean(pvals)
-        #combo_pval = asym_hmean_pval(pvals)
-        fisher_stat = calc_fisher_statistic(pvals)
-        brown_pval = get_p_value(f, c, fisher_stat)
-        
-        combo_d_pvals.append((accession, gene, treatment, brown_pval, fisher_stat))
-    
-    combo_frame = pandas.DataFrame(combo_d_pvals,
-                                   columns=['PG.ProteinAccessions',
-                                             'PG.Genes',
-                                             'Treatment',
-                                             'combo_dunnett_pvalue',
-                                             'Fisher statistic'])
-    
-    return combo_frame
 
 
 def graph_all_proteins(data, all_comps, focus, filename, treatment, control):
@@ -422,84 +322,8 @@ def run_analysis(data, candidates, method='dunnett', datadir=None):
     
     if datadir is None:
         datadir = cetsa_paths.get_outdir()
-    
-    if method == 'dunnett':
-        dunnetts = get_all_dunnett_tests(data)
-        #ignore 37 degrees
-        dunnetts = dunnetts.loc[dunnetts['Temperature'] > 37, :]
-        combo_dunnetts = collect_dunnetts(dunnetts)
-        auc_table = auc_all_proteins(data)
-        combo_stats = combo_dunnetts.merge(auc_table,
-                                           how='left',
-                                           on=['PG.ProteinAccessions',
-                                               'PG.Genes',
-                                               'Treatment'])
-        cd_quercetin = combo_stats.loc[combo_dunnetts['Treatment'] == 'Quercetin',:].copy()
-        cd_fisetin = combo_stats.loc[combo_dunnetts['Treatment'] == 'Fisetin',:].copy()
-        cd_myricetin = combo_stats.loc[combo_dunnetts['Treatment'] == 'Myricetin',:].copy()
-        cd_quercetin.loc[:, 'bh_pval'] = stats.false_discovery_control(cd_quercetin['combo_dunnett_pvalue'],
-                                                                       method='bh')
-        cd_fisetin.loc[:,'bh_pval'] = stats.false_discovery_control(cd_fisetin['combo_dunnett_pvalue'],
-                                                                    method='bh')
-        cd_myricetin.loc[:,'bh_pval'] = stats.false_discovery_control(cd_myricetin['combo_dunnett_pvalue'],
-                                                                      method='bh')
-        sig_quercetin = cd_quercetin[cd_quercetin['bh_pval'] < 0.05]
-        sig_fisetin = cd_fisetin[cd_fisetin['bh_pval'] < 0.05]
-        sig_myricetin = cd_myricetin[cd_myricetin['bh_pval'] < 0.05]
-        myr_genes = set(sig_myricetin['PG.Genes'])
-        notshared_quercetin = sig_quercetin[~sig_quercetin['PG.Genes'].isin(myr_genes)]
-        notshared_fisetin = sig_fisetin[~sig_fisetin['PG.Genes'].isin(myr_genes)]
-        candidate_genes = candidates[['Genes', 
-                                      'UniProtIds', 
-                                      'ProteinDescriptions',
-                                      'GO Biological Process',
-                                      'GO Molecular Function',
-                                      'GO Cellular Component']].drop_duplicates()
-        focal_quercetin = notshared_quercetin.merge(candidate_genes,
-                                                    how='left',
-                                                    left_on=['PG.ProteinAccessions', 'PG.Genes'],
-                                                    right_on=['UniProtIds', 'Genes'])
-        focal_fisetin = notshared_fisetin.merge(candidate_genes,
-                                                how='left',
-                                                left_on=['PG.ProteinAccessions', 'PG.Genes'],
-                                                right_on=['UniProtIds', 'Genes'])
-        all_quercetin = cd_quercetin.merge(candidate_genes,
-                                           how='left',
-                                           left_on=['PG.ProteinAccessions', 'PG.Genes'],
-                                           right_on=['UniProtIds', 'Genes'])
-        all_fisetin = cd_fisetin.merge(candidate_genes,
-                                       how='left',
-                                       left_on=['PG.ProteinAccessions', 'PG.Genes'],
-                                       right_on=['UniProtIds', 'Genes'])
         
-        focal_quercetin.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
-        focal_fisetin.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
-        all_quercetin.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
-        all_fisetin.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
-        
-        combo_stats.sort_values(by=['combo_dunnett_pvalue'], inplace=True, kind='mergesort')
-        combo_stats.to_csv(datadir / "ITA_allcomps_Oct2024_Dunnett.csv")
-        
-        focal_quercetin.to_csv(datadir / "ITA_focal_quercetin_Oct2024_Dunnet.csv")
-        focal_fisetin.to_csv(datadir / "ITA_focal_fisetin_Oct2024_Dunnet.csv")
-        all_quercetin.to_csv(datadir / "ITA_all_quercetin_Oct2024_Dunnet.csv")
-        all_fisetin.to_csv(datadir / "ITA_all_fisetin_Oct2024_Dunnet.csv")
-        graph_all_proteins(data, 
-                           dunnetts, 
-                           focal_fisetin, 
-                           datadir / "ITA_Fisetin_signif_graphs_Dunnet.pdf",
-                           'Fisetin',
-                           'DMSO')
-        graph_all_proteins(data,
-                           dunnetts,
-                           focal_quercetin,
-                           datadir / "ITA_Quercetin_signif_graphs_Dunnet.pdf",
-                           'Quercetin',
-                           'DMSO')
-        
-        return focal_fisetin, focal_quercetin
-        
-    elif method == 'student':
+    if method == 'student':
         students = get_all_student_tests(data)
         students = students.loc[students['Temperature'] > 37, :]
         combo_students = collect_students(students)
