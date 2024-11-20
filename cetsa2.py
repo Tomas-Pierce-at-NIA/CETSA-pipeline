@@ -215,31 +215,71 @@ def create_subtables(focused_data, dataprep):
     treatments.remove('DMSO')
     controls = {'DMSO', 'Myricetin'}
     
-    proteins = focused_data.groupby(by=['PG.ProteinAccessions', 'PG.Genes'])
+    pairs = itertools.product(treatments, controls)
+    depairs = filter(lambda x : x[0] != x[1], pairs)
     
-    for prot_id, prot_table in proteins:
-        
-        clean_table = prot_table.dropna(subset=['Temperature', NORMPROT],
-                                        ignore_index=True)
-        
-        pairs = itertools.product(treatments, controls)
-        depairs = filter(lambda x : x[0] != x[1], pairs)
-        for cond1, cond2 in depairs:
-            try:
-                indata, outdata, treatdata = dataprep.transform(clean_table, cond1, cond2)
-            except Exception as e:
-                logger.warning(f"Could not subtable {prot_id}, {cond1}, {cond2}",
-                              exc_info=e)
-                continue
-            inputs.append(indata)
-            outputs.append(outdata)
-            treats.append(treatdata)
-            cond1s.append(cond1)
-            cond2s.append(cond2)
-            prot_identities.append(prot_id)
-            subtables.append(prot_table)
     
-    return inputs, outputs, treats, cond1s, cond2s, prot_identities, subtables
+    for cond1, cond2 in depairs:
+        try:
+            indatas, outdatas, treatdatas, prot_ids = dataprep.transform(focused_data, cond1, cond2)
+            prots = prot_ids.reset_index()
+            reset_treat = treatdatas.reset_index()
+            reset_focused = focused_data.reset_index()
+            for prot in prots.groupby(by=['PG.ProteinAccessions', 'PG.Genes']):
+                idx = prot[1].index
+                
+                indata = indatas[idx, :]
+                outdata = outdatas[idx]
+                treatdata = reset_treat.loc[idx]
+                prot_id = prot[0]
+                prot_table = reset_focused.loc[idx]
+                
+                inputs.append(indata)
+                outputs.append(outdata)
+                treats.append(treatdata)
+                cond1s.append(cond1)
+                cond2s.append(cond2)
+                prot_identities.append(prot_id)
+                subtables.append(prot_table)
+                
+        except Exception as e:
+            raise e
+    
+    return (inputs,
+            outputs,
+            treats,
+            cond1s,
+            cond2s,
+            prot_identities,
+            subtables)
+    
+    
+    
+    # proteins = focused_data.groupby(by=['PG.ProteinAccessions', 'PG.Genes'])
+    
+    # for prot_id, prot_table in proteins:
+        
+    #     clean_table = prot_table.dropna(subset=['Temperature', NORMPROT],
+    #                                     ignore_index=True)
+        
+    #     pairs = itertools.product(treatments, controls)
+    #     depairs = filter(lambda x : x[0] != x[1], pairs)
+    #     for cond1, cond2 in depairs:
+    #         try:
+    #             indata, outdata, treatdata, _ = dataprep.transform(clean_table, cond1, cond2)
+    #         except Exception as e:
+    #             logger.warning(f"Could not subtable {prot_id}, {cond1}, {cond2}",
+    #                           exc_info=e)
+    #             continue
+    #         inputs.append(indata)
+    #         outputs.append(outdata)
+    #         treats.append(treatdata)
+    #         cond1s.append(cond1)
+    #         cond2s.append(cond2)
+    #         prot_identities.append(prot_id)
+    #         subtables.append(prot_table)
+    
+    # return inputs, outputs, treats, cond1s, cond2s, prot_identities, subtables
 
     
 

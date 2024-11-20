@@ -248,6 +248,8 @@ def prepare_data(display=False, data_path = None, candidate_path = None):
     
     normalized_data = norm_protein_mintemp(filtered_data)
     
+    normalized_data = normalized_data.dropna(subset=['Temperature', 'Normalized_FG_Quantity'])
+    
     return normalized_data, filtered_candidates
 
 
