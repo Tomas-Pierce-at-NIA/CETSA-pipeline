@@ -219,6 +219,13 @@ def create_subtables(focused_data, dataprep):
     depairs = filter(lambda x : x[0] != x[1], pairs)
     
     
+    # we were able to reduce runtime from 2.5 minutes
+    # to 12 seconds by reducing the number of times
+    # we have to call the dataprep.transform function
+    # by running it across the entire dataset for each
+    # comparison and separating the proteins out second
+    # rather than runnning it on each protein subpage
+    # in separate calls
     for cond1, cond2 in depairs:
         try:
             indatas, outdatas, treatdatas, prot_ids = dataprep.transform(focused_data, cond1, cond2)
@@ -252,35 +259,6 @@ def create_subtables(focused_data, dataprep):
             cond2s,
             prot_identities,
             subtables)
-    
-    
-    
-    # proteins = focused_data.groupby(by=['PG.ProteinAccessions', 'PG.Genes'])
-    
-    # for prot_id, prot_table in proteins:
-        
-    #     clean_table = prot_table.dropna(subset=['Temperature', NORMPROT],
-    #                                     ignore_index=True)
-        
-    #     pairs = itertools.product(treatments, controls)
-    #     depairs = filter(lambda x : x[0] != x[1], pairs)
-    #     for cond1, cond2 in depairs:
-    #         try:
-    #             indata, outdata, treatdata, _ = dataprep.transform(clean_table, cond1, cond2)
-    #         except Exception as e:
-    #             logger.warning(f"Could not subtable {prot_id}, {cond1}, {cond2}",
-    #                           exc_info=e)
-    #             continue
-    #         inputs.append(indata)
-    #         outputs.append(outdata)
-    #         treats.append(treatdata)
-    #         cond1s.append(cond1)
-    #         cond2s.append(cond2)
-    #         prot_identities.append(prot_id)
-    #         subtables.append(prot_table)
-    
-    # return inputs, outputs, treats, cond1s, cond2s, prot_identities, subtables
-
     
 
 def _model_fit_task(model_inputs):
