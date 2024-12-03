@@ -8,7 +8,10 @@ Created on Mon Nov 18 14:30:58 2024
 NORMPROT = 'Normalized_FG_Quantity'
 N_COND = 4
 
+Q = 200
+
 import cetsa2
+from nparc_model import NPARCModel
 from data_prepper import DataPreparer
 #from data_prepper2 import DataPreparer
 import t_infl
@@ -16,6 +19,12 @@ import load_monocyte_cetsa_data as load
 import cProfile
 import pandas
 import numpy as np
+
+def _model_fit_task(model_inputs):
+    interact_in, out = model_inputs
+    model = NPARCModel(alpha=0.0)
+    model.fit(interact_in, out)
+    return model
 
 def main():
     print("loading")
@@ -38,25 +47,25 @@ def main():
     models = []
     i = 0
     for model_train in model_inputs:
-        if i == 100:
+        if i == Q:
             break
-        model = cetsa2._model_fit_task(model_train)
+        model = _model_fit_task(model_train)
         models.append(model)
         i += 1
         print(i)
     
     prot_accessions = [p[0] for p in prot_idents]
     gene_ids = [p[1] for p in prot_idents]
-    datatable = pandas.DataFrame({'PG.ProteinAccessions': prot_accessions[:100],
-                                  'PG.Genes': gene_ids[:100],
-                                  'Treatment 1' : cond_lefts[:100],
-                                  'Treatment 2': cond_rights[:100],
-                                  'model': models[:100]})
+    datatable = pandas.DataFrame({'PG.ProteinAccessions': prot_accessions[:Q],
+                                  'PG.Genes': gene_ids[:Q],
+                                  'Treatment 1' : cond_lefts[:Q],
+                                  'Treatment 2': cond_rights[:Q],
+                                  'model': models[:Q]})
     t1_inflects = []
     t2_inflects = []
     j = 0
     for model in models:
-        if j == 100:
+        if j == Q:
             break
         t1 = t_infl.get_T1_inflection(model)
         t2 = t_infl.get_T2_inflection(model)
@@ -73,7 +82,7 @@ def main():
     
     k = 0
     for model in models:
-        if k == 100:
+        if k == Q:
             break
         cetsa2._permutation_test(model, 
                                  in_datas[k],
