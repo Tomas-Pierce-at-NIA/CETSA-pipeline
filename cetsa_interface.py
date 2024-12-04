@@ -15,6 +15,7 @@ import threading
 
 import cetsa_paths
 import CETSA_individual_temperature as ita
+import cetsa2
 import load_monocyte_cetsa_data as load
 
 
@@ -131,6 +132,8 @@ def run(method, datapath, candidatepath, outpath):
         return
     
     elif method == MethodChooser.NPARC:
+        #data, candidates = load.prepare_data(False, datafile, candidatefile)
+        cetsa2.main(datafile, candidatefile, outdir)
         return
     
     else:

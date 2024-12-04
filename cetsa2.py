@@ -66,7 +66,7 @@ def ymax_logit_mse(y_predicted, y_actuals):
     return mse(y_pred_logit, y_act_logit)
 
 
-#def _permutation_test(model, datapart, ident, rng, n=50_000):
+
 def _permutation_test(model, indata, outdata, treatdata, cat1, cat2, ident, rng, n=50_000):
     
     # need to denote tables where we don't have the raw data
@@ -287,11 +287,13 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None):
             subdata = data_table.loc[(data_table['PG.ProteinAccessions'] == acc) & (data_table['PG.Genes'] == gene),:]
             subdata = subdata.loc[subdata['Treatment'].isin([treatment1,treatment2])]
             
-            ins, outs, treats = dataprep.transform(subdata, treatment1, treatment2)
+            ins, outs, treats, _protids = dataprep.transform(subdata, treatment1, treatment2)
             
             hypo = pandas.DataFrame({'Temperature' : list(range(37,71)) * 2,
                                      'Treatment': [treatment1] * (71 - 37) + [treatment2] * (71-37),
-                                     NORMPROT: [0.0] * (2 * (71 - 37))})
+                                     NORMPROT: [0.0] * (2 * (71 - 37)),
+                                     'PG.ProteinAccessions' : [''] * (2 * (71 - 37)),
+                                     'PG.Genes' : [''] * (2 * (71 - 37))})
             
             seaborn.scatterplot(subdata,
                                 x='Temperature',
@@ -301,7 +303,7 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None):
                                 ax=ax,
                                 palette=palette)
             
-            hypo_in, _, hypo_treats = dataprep.transform(hypo, treatment1, treatment2)
+            hypo_in, hypo_out, hypo_treats, hypo_protids = dataprep.transform(hypo, treatment1, treatment2)
             
             model = sig_table.loc[idx, 'model']
             

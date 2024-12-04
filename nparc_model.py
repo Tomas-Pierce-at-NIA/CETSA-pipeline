@@ -60,7 +60,7 @@ def _loss(params: np.ndarray, X: np.ndarray, y: np.ndarray, alpha=0.0) -> float:
 
 
 
-def _fit_nparc(X: np.ndarray, y: np.ndarray, alpha=0.0) -> tuple:
+def _fit_nparc(X: np.ndarray, y: np.ndarray, alpha=0.0) -> optimize.OptimizeResult:
     pshape = (X.shape[1] + 1,)
     init_params = np.zeros(pshape) - 0.01
     # may be able to avoid pathology in p-derivative

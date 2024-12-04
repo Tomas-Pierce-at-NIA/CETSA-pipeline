@@ -8,12 +8,12 @@ Created on Mon Nov 18 14:30:58 2024
 NORMPROT = 'Normalized_FG_Quantity'
 N_COND = 4
 
-Q = 200
+Q = 500
 
 import cetsa2
 from nparc_model import NPARCModel
+
 from data_prepper import DataPreparer
-#from data_prepper2 import DataPreparer
 import t_infl
 import load_monocyte_cetsa_data as load
 import cProfile
