@@ -274,8 +274,10 @@ def pfit_models(datapieces):
 
 
 
-def display_graphs(filename, sig_table, data_table, dataprep, palette=None):
-    with PdfPages(cetsa_paths.get_outdir() / filename, keep_empty=False) as pdf:
+def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outdir=None):
+    if outdir is None:
+        outdir = cetsa_paths.get_outdir()
+    with PdfPages(outdir / filename, keep_empty=False) as pdf:
         for idx in sig_table.index:
             ax = pyplot.subplot()
             acc = sig_table.loc[idx, 'PG.ProteinAccessions']
@@ -457,9 +459,19 @@ def main(datapath=None, candidatepath=None, outdir=None):
     
     unshared_quercetin.to_csv(outdir / 'nparc_unshared_quercetin_Oct2024.csv')
     
-    display_graphs("nparc_Oct2024_fisetin.pdf", unshared_fisetin, narrow_data, dataprep, dataprep.palette())
+    display_graphs("nparc_Oct2024_fisetin.pdf", 
+                   unshared_fisetin, 
+                   narrow_data, 
+                   dataprep, 
+                   dataprep.palette(),
+                   outdir)
     
-    display_graphs("nparc_Oct2024_quercetin.pdf", unshared_quercetin, narrow_data, dataprep, dataprep.palette())
+    display_graphs("nparc_Oct2024_quercetin.pdf", 
+                   unshared_quercetin, 
+                   narrow_data, 
+                   dataprep, 
+                   dataprep.palette(),
+                   outdir)
     
     
     return table

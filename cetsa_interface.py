@@ -11,7 +11,6 @@ from tkinter import filedialog
 
 from pathlib import Path
 
-import threading
 
 import cetsa_paths
 import CETSA_individual_temperature as ita
@@ -183,17 +182,6 @@ def ui():
     
     debug_but = ttk.Button(window, command=showdata, text="Debug")
     
-    def invoke():
-        method = approach.get()
-        candidatepath = candidate_filepath.get()
-        datapath = data_filepath.get()
-        outdir = outdir_filepath.get()
-        thread = threading.Thread(target=run, args=(method, datapath, candidatepath, outdir))
-        thread.start()
-        return thread
-    
-    threads = []
-    
     run_but = ttk.Button(window, 
                          command=lambda:run(approach.get(),
                                             data_filepath.get(),
@@ -211,8 +199,7 @@ def ui():
     
     window.mainloop()
     
-    for thread in threads:
-        thread.join()
+
 
 
 if __name__ == '__main__':
