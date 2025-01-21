@@ -254,7 +254,11 @@ def norm_protein_mintemp(data):
 
 
 def prepare_data(display=False, data_path = None, candidate_path = None):
-    "General data loading routine, including filtering and normalization"
+    """General data loading routine, including filtering and normalization,
+    loads both data (normalized) and candidates (filtered).
+    Primary point of interaction with the loading module, all other components
+    are implementation.
+    """
     filtered_data, filtered_candidates = load_data(data_path, candidate_path)
     calc_total_protein_quantity(filtered_data)
     #breakpoint()
