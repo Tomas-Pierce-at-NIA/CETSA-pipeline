@@ -100,11 +100,6 @@ def remove_deprecated_columns(table):
         if cname.startswith('[DEPRECATED]'):
             del table[cname]
 
-def get_left(s :str) -> str: # helper function
-    return s.split(' ')[0]
-
-def get_right(s :str) -> str: # helper function
-    return s.split(' ')[1]
 
 
 def rename_special_columns(candidate_table):
@@ -119,8 +114,7 @@ def rename_special_columns(candidate_table):
         "# Unique Total EG.Id" : "Number_Unique_Total_EGid"
         })
 
-def _space_split(s: str) -> (str, str): # helper function
-    return s.split(' ')
+
 
 def load_data(data_path = None, candidate_path = None):
     """Load in data and perform filtering and data processing steps
