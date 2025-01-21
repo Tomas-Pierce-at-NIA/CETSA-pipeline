@@ -41,7 +41,7 @@ def get_candidates_filepath(cached=False) -> Path:
     
     if platform.system() == 'Windows':
         if cached:
-            cachepath = r'C:\Users\piercetf\Downloads\CachedCETSAData\Candidates.tsv'
+            cachepath = r"C:\Users\piercetf\Projects\CachedCETSAData\Candidates.tsv"
             return Path(cachepath)
         else:
             canonpath = r'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Candidates.tsv'
@@ -58,7 +58,7 @@ def get_candidates_filepath(cached=False) -> Path:
 def get_data_filepath(cached=False) -> Path:
     if platform.system() == 'Windows':
         if cached:
-            cachedpath = r"C:\Users\piercetf\Downloads\CachedCETSAData\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv"
+            cachedpath = r"C:\Users\piercetf\Projects\CachedCETSAData\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv"
             return Path(cachedpath)
         else:
             canonpath = r"T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv"
