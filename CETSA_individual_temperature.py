@@ -382,7 +382,7 @@ def auc_all_proteins(data: pandas.DataFrame) -> pandas.DataFrame:
     return frame
 
 
-def run_analysis(data, candidates, method='dunnett', datadir=None):
+def run_analysis(data, candidates, datadir=None):
     """
     Responsible for overall running of individual-temperature based analysis.
     """
@@ -390,95 +390,93 @@ def run_analysis(data, candidates, method='dunnett', datadir=None):
     if datadir is None:
         datadir = cetsa_paths.get_outdir()
         
-    if method == 'student':
-        students = get_all_student_tests(data)
-        students = students.loc[students['Temperature'] > 37, :]
-        combo_students = collect_students(students)
-        auc_table = auc_all_proteins(data)
-        combo_stats = combo_students.merge(auc_table,
-                                           how='left',
-                                           on=['PG.ProteinAccessions',
-                                               'PG.Genes',
-                                               'Treatment'])
-        
-        good_combo_stats = combo_stats.dropna(subset=['combo_student_pvalue'])
-        
-        good_combo_stats.loc[:, 'bh_pval'] =stats.false_discovery_control(good_combo_stats['combo_student_pvalue'])
-        
-        candidate_genes = candidates[['Genes', 
-                                      'UniProtIds', 
-                                      'ProteinDescriptions',
-                                      'GO Biological Process',
-                                      'GO Molecular Function',
-                                      'GO Cellular Component']].drop_duplicates()
-        
-        all_info = good_combo_stats.merge(candidate_genes,
-                                          how='left',
-                                          left_on=['PG.ProteinAccessions', 'PG.Genes'],
-                                          right_on=['UniProtIds', 'Genes'])
-        
-        sigtable = all_info.loc[all_info['bh_pval'] < 0.05, :]
-        
-        sigtable.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
-        all_info.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
-        
-        sigtable.to_csv(datadir / "ITA_signif_comps_Student_Oct2024.csv")
-        all_info.to_csv(datadir / "ITA_all_comps_Student_Oct2024.csv")
-        
-        fisetin1 = sigtable.loc[(sigtable['Treatment'] == 'Fisetin') & (sigtable['Control'] == 'DMSO'),:]
-        fisetin2 = sigtable.loc[(sigtable['Treatment'] == 'Fisetin') & (sigtable['Control'] == 'Myricetin'),:]
-        
-        quercetin1 = sigtable.loc[(sigtable['Treatment'] == 'Quercetin') & (sigtable['Control'] == 'DMSO'),:]
-        quercetin2 = sigtable.loc[(sigtable['Treatment'] == 'Quercetin')&(sigtable['Control']=='Myricetin'),:]
-        
-        myricetin = sigtable.loc[(sigtable['Treatment'] == 'Myricetin'),:]
-        
-        myr_genes = set(myricetin['PG.Genes'])
-        
-        fisetin_all = pandas.concat([fisetin1, fisetin2])
-        quercetin_all = pandas.concat([quercetin1, quercetin2])
-        
-        fisetin_all = fisetin_all.loc[~fisetin_all['PG.Genes'].isin(myr_genes),:]
-        quercetin_all = quercetin_all.loc[~quercetin_all['PG.Genes'].isin(myr_genes),:]
-        
-        fisetin_all.to_csv(datadir / "ITA_fisetin_Student_Oct2024.csv")
-        quercetin_all.to_csv(datadir / "ITA_quercetin_Student_Oct2024.csv")
-        
-        graph_all_proteins(data,
-                           students,
-                           fisetin1,
-                           datadir / "ITA_fisetinVDMSO_Student_Oct2024.pdf",
-                           'Fisetin',
-                           'DMSO')
-        
-        graph_all_proteins(data,
-                           students,
-                           fisetin2,
-                           datadir / "ITA_fisetinVmyricetin_Student_Oct2024.pdf",
-                           'Fisetin',
-                           'Myricetin')
-        
-        graph_all_proteins(data,
-                           students,
-                           quercetin1,
-                           datadir / "ITA_quercetinVDMSO_Student_Oct2024.pdf",
-                           'Quercetin',
-                           'DMSO')
-        
-        graph_all_proteins(data,
-                           students,
-                           quercetin2,
-                           datadir / "ITA_quercetinVmyricetin_Student_Oct2024.pdf",
-                           'Quercetin',
-                           'Myricetin')
-        
-        return fisetin_all, quercetin_all
+    students = get_all_student_tests(data)
+    students = students.loc[students['Temperature'] > 37, :]
+    combo_students = collect_students(students)
+    auc_table = auc_all_proteins(data)
+    combo_stats = combo_students.merge(auc_table,
+                                       how='left',
+                                       on=['PG.ProteinAccessions',
+                                           'PG.Genes',
+                                           'Treatment'])
+    
+    good_combo_stats = combo_stats.dropna(subset=['combo_student_pvalue'])
+    
+    good_combo_stats.loc[:, 'bh_pval'] =stats.false_discovery_control(good_combo_stats['combo_student_pvalue'])
+    
+    candidate_genes = candidates[['Genes', 
+                                  'UniProtIds', 
+                                  'ProteinDescriptions',
+                                  'GO Biological Process',
+                                  'GO Molecular Function',
+                                  'GO Cellular Component']].drop_duplicates()
+    
+    all_info = good_combo_stats.merge(candidate_genes,
+                                      how='left',
+                                      left_on=['PG.ProteinAccessions', 'PG.Genes'],
+                                      right_on=['UniProtIds', 'Genes'])
+    
+    sigtable = all_info.loc[all_info['bh_pval'] < 0.05, :]
+    
+    sigtable.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
+    all_info.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
+    
+    sigtable.to_csv(datadir / "ITA_signif_comps_Student_Oct2024.csv")
+    all_info.to_csv(datadir / "ITA_all_comps_Student_Oct2024.csv")
+    
+    fisetin1 = sigtable.loc[(sigtable['Treatment'] == 'Fisetin') & (sigtable['Control'] == 'DMSO'),:]
+    fisetin2 = sigtable.loc[(sigtable['Treatment'] == 'Fisetin') & (sigtable['Control'] == 'Myricetin'),:]
+    
+    quercetin1 = sigtable.loc[(sigtable['Treatment'] == 'Quercetin') & (sigtable['Control'] == 'DMSO'),:]
+    quercetin2 = sigtable.loc[(sigtable['Treatment'] == 'Quercetin')&(sigtable['Control']=='Myricetin'),:]
+    
+    myricetin = sigtable.loc[(sigtable['Treatment'] == 'Myricetin'),:]
+    
+    myr_genes = set(myricetin['PG.Genes'])
+    
+    fisetin_all = pandas.concat([fisetin1, fisetin2])
+    quercetin_all = pandas.concat([quercetin1, quercetin2])
+    
+    fisetin_all = fisetin_all.loc[~fisetin_all['PG.Genes'].isin(myr_genes),:]
+    quercetin_all = quercetin_all.loc[~quercetin_all['PG.Genes'].isin(myr_genes),:]
+    
+    fisetin_all.to_csv(datadir / "ITA_fisetin_Student_Oct2024.csv")
+    quercetin_all.to_csv(datadir / "ITA_quercetin_Student_Oct2024.csv")
+    
+    graph_all_proteins(data,
+                       students,
+                       fisetin1,
+                       datadir / "ITA_fisetinVDMSO_Student_Oct2024.pdf",
+                       'Fisetin',
+                       'DMSO')
+    
+    graph_all_proteins(data,
+                       students,
+                       fisetin2,
+                       datadir / "ITA_fisetinVmyricetin_Student_Oct2024.pdf",
+                       'Fisetin',
+                       'Myricetin')
+    
+    graph_all_proteins(data,
+                       students,
+                       quercetin1,
+                       datadir / "ITA_quercetinVDMSO_Student_Oct2024.pdf",
+                       'Quercetin',
+                       'DMSO')
+    
+    graph_all_proteins(data,
+                       students,
+                       quercetin2,
+                       datadir / "ITA_quercetinVmyricetin_Student_Oct2024.pdf",
+                       'Quercetin',
+                       'Myricetin')
+    
+    return fisetin_all, quercetin_all
         
 
 
 if __name__ == '__main__':
     
     data, candidates = load.prepare_data(False)
-    stud_fis, stud_quer = run_analysis(data, candidates, method='student')
-    #dun_fis, dun_quer = run_analysis(data, candidates, method='dunnett')
+    stud_fis, stud_quer = run_analysis(data, candidates)
 

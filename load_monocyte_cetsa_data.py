@@ -11,25 +11,19 @@ from matplotlib import pyplot
 
 import cetsa_paths
 
-DATA_COLUMNS = ['PG.ProteinAccessions',
-                'PG.Genes',
-                'R.Condition',
-                'R.Replicate',
-                'FG.Quantity']
 
-CANDIDATE_COLUMNS = ['Condition Numerator',
-                     'Condition Denominator',
-                     'ProteinGroups',
-                     'ProteinNames',
-                     'ProteinDescriptions',
-                     'Genes',
-                     'UniProtIds',
-                     'GO Biological Process',
-                     'GO Molecular Function',
-                     'GO Cellular Component',
-                     '# Unique Total Peptides']
 
 def load_candidates(candidate_path = None):
+    
+    CANDIDATE_COLUMNS = ['Condition Numerator',
+                         'Condition Denominator',
+                         'ProteinGroups',
+                         'ProteinNames',
+                         'ProteinDescriptions',
+                         'Genes',
+                         'UniProtIds',
+                         '# Unique Total Peptides']
+    
     
     if candidate_path is None:
         cached_path = cetsa_paths.get_candidates_filepath(True)
@@ -42,7 +36,8 @@ def load_candidates(candidate_path = None):
     try:
         candidates = pandas.read_csv(cached_path, 
                                      sep='\t',
-                                     usecols=CANDIDATE_COLUMNS)
+                                     usecols=CANDIDATE_COLUMNS,
+                                     engine='pyarrow')
     except Exception as e:
         print("Trying to load cached version failed, falling back to canonical path")
         print("Relevant error was: {}".format(e))
@@ -55,6 +50,12 @@ def load_candidates(candidate_path = None):
 
 def load_basedata(data_path = None):
     
+    DATA_COLUMNS = ['PG.ProteinAccessions',
+                    'PG.Genes',
+                    'R.Condition',
+                    'R.Replicate',
+                    'FG.Quantity']
+    
     if data_path is None:
         cached_path = cetsa_paths.get_data_filepath(True)
         canon_path = cetsa_paths.get_data_filepath(False)
@@ -66,7 +67,8 @@ def load_basedata(data_path = None):
     try:
         basedata = pandas.read_csv(cached_path, 
                                    sep='\t',
-                                   usecols=DATA_COLUMNS)
+                                   usecols=DATA_COLUMNS,
+                                   engine='pyarrow')
     except Exception as e:
         print("Trying to load cached version failed, falling back to canonical path")
         print("Relevant error was: {}".format(e))
@@ -98,10 +100,10 @@ def remove_deprecated_columns(table):
         if cname.startswith('[DEPRECATED]'):
             del table[cname]
 
-def get_left(s :str) -> (str, str): # helper function
+def get_left(s :str) -> str: # helper function
     return s.split(' ')[0]
 
-def get_right(s :str) -> (str, str): # helper function
+def get_right(s :str) -> str: # helper function
     return s.split(' ')[1]
 
 
@@ -117,6 +119,8 @@ def rename_special_columns(candidate_table):
         "# Unique Total EG.Id" : "Number_Unique_Total_EGid"
         })
 
+def _space_split(s: str) -> (str, str): # helper function
+    return s.split(' ')
 
 def load_data(data_path = None, candidate_path = None):
     """Load in data and perform filtering and data processing steps
@@ -126,7 +130,8 @@ def load_data(data_path = None, candidate_path = None):
     
     multipep_data, multipep_candidates = remove_unipeptides(basedata, candidates)
     
-    remove_deprecated_columns(multipep_candidates)
+    # unneeded because we only load in columns we actually use
+    # remove_deprecated_columns(multipep_candidates)
     
     # remove this column by not loading it to begin with
     #del multipep_candidates['Valid'] # don't know, based on template
@@ -134,10 +139,21 @@ def load_data(data_path = None, candidate_path = None):
     # add aliases for variables to avoid problems with special characters
     multipep_candidates = rename_special_columns(multipep_candidates)
     
-    multipep_candidates.loc[:, "Treatment_Numerator"] = multipep_candidates["Condition Numerator"].map(get_left)
-    multipep_candidates.loc[:, "Temperature_Numerator"] = multipep_candidates["Condition Numerator"].map(get_right)
-    multipep_candidates.loc[:, "Treatment_Denominator"] = multipep_candidates["Condition Denominator"].map(get_left)
-    multipep_candidates.loc[:, "Temperature_Denominator"] = multipep_candidates["Condition Denominator"].map(get_right)
+
+    
+    treat_temp_num = multipep_candidates['Condition Numerator'].str.split(
+        ' ',
+        expand=True
+        )
+    
+    multipep_candidates.loc[:, 'Treatment_Numerator'] = treat_temp_num[0]
+    multipep_candidates.loc[:, 'Temperature_Numerator'] = treat_temp_num[1].astype(float)
+    
+    treat_temp_denom = multipep_candidates['Condition Denominator'].str.split(
+        ' ',
+        expand=True)
+    multipep_candidates.loc[:, 'Treatment_Denominator'] = treat_temp_denom[0]
+    multipep_candidates.loc[:, 'Temperature_Denominator'] = treat_temp_denom[1].astype(float)
     
     # only consider comparisons at the same temperature
     sametemp_multipep_candidates = multipep_candidates.loc[multipep_candidates.Temperature_Numerator == multipep_candidates.Temperature_Denominator,:].copy()
@@ -146,10 +162,15 @@ def load_data(data_path = None, candidate_path = None):
     temp_ints = pandas.to_numeric(sametemp_multipep_candidates["Temperature_Numerator"])
     sametemp_multipep_candidates['Temperature'] = temp_ints
     
-    # split out between substance and temperature
+    treat_temp_dat = multipep_data['R.Condition'].str.split(
+        ' ',
+        expand=True)
+    
+    # split out between substance and temperature 
+    # use assign to intentionally make copy
     multipep_data = multipep_data.assign(
-        Treatment=multipep_data["R.Condition"].map(get_left),
-        Temperature=pandas.to_numeric(multipep_data["R.Condition"].map(get_right))
+        Treatment=treat_temp_dat[0],
+        Temperature=treat_temp_dat[1].astype(float)
         )
     
     return multipep_data, sametemp_multipep_candidates
@@ -255,5 +276,5 @@ def prepare_data(display=False, data_path = None, candidate_path = None):
 
 
 if __name__ == '__main__':
-    #breakpoint()
     d,c = prepare_data()
+    
