@@ -82,8 +82,9 @@ class PermutationTest:
         okay_act = scaled_logit_act[okay]
         okay_pred = scaled_logit_pred[okay]
         
+        mse = np.mean((okay_act - okay_pred)**2)
         #breakpoint()
-        return metrics.mean_squared_error(okay_act, okay_pred)
+        return mse
     
     
     def fast_ecdf(self):
