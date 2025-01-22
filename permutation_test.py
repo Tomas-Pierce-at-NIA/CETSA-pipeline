@@ -9,7 +9,6 @@ import numpy as np
 from scipy import special, stats
 from sklearn import metrics
 import time
-import heapq
 
 class PermutationTest:
     
