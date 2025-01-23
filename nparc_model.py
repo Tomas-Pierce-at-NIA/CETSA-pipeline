@@ -99,8 +99,8 @@ def _fit_nparc(X: np.ndarray, y: np.ndarray, alpha=0.0) -> optimize.OptimizeResu
                                    init_params,
                                    (X, y, alpha),
                                    'L-BFGS-B',
-                                   bounds=bounds,
-                                   jac=_gradient)
+                                   bounds=bounds)#,
+                                   #jac=_gradient)
                                   # jac=_gradient)
     return bfgs_res
 

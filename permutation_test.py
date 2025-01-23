@@ -34,12 +34,21 @@ class PermutationTest:
         self.__base_mse = None
         
     
+    
     def permute(self):
         # randomly permute the category assignments in place in the working copy
-        self.rng.shuffle(self.working[:,2])
-        self.working[:,3] = 1 - self.working[:,2]
-        self.working[:,4] = self.working[:,1] * self.working[:,2]
-        self.working[:,5] = self.working[:,1] * self.working[:,3]
+        #self.rng.shuffle(self.working[:,2])
+        
+        blank = np.empty_like(self.working)
+        blank[:,[0,1]] = self.working[:, [0,1]]
+        cat1_permuted = self.rng.permutation(self.working[:,2])
+        blank[:, 2] = cat1_permuted
+        blank[:, 3] = 1 - cat1_permuted
+        blank[:,4] = blank[:,1] * blank[:,2]
+        blank[:,5] = blank[:,1] * blank[:,3]
+        
+        self.working = blank
+        
     
     
     @property 
@@ -62,13 +71,21 @@ class PermutationTest:
     
     
     def scaled_logit(self, data):
-        scaled = data / self.y_max
+        scaled = data / (self.y_max * 1.1)
         return special.logit(scaled)
     
+    @staticmethod
+    def mse(predicted, actual):
+        diffs = predicted - actual
+        sqdif = diffs**2
+        return sqdif.mean()
+    
+    def adj_logit(self, data):
+        return np.log(data) - np.log1p(-data + self.y_max)
     
     def scaled_logit_mse(self, y_pred, y_act):
-        scaled_logit_pred = self.scaled_logit(y_pred)
-        scaled_logit_act = self.scaled_logit(y_act)
+        scaled_logit_pred = self.adj_logit(y_pred)
+        scaled_logit_act = self.adj_logit(y_act)
         
         pred_inf = np.isinf(scaled_logit_pred)
         act_inf = np.isinf(scaled_logit_act)
@@ -103,11 +120,14 @@ class PermutationTest:
             return (pval, *interval, 'ecdf-faststop', 
                     -1, self.ident, self.cat1, self.cat2)
         else:
-            return None
+            return (False,)
     
     def permutation_test(self, n: int=50_000):
+        if self.data_insufficient:
+            return self.data_insufficient_row()
+        
         fast = self.fast_ecdf()
-        if fast is not None:
+        if fast[0] > 0.2:
             return fast
         
         neg_base_mse = -self.base_mse

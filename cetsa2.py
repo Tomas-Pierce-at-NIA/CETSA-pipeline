@@ -17,10 +17,11 @@ import platform
 
 
 from data_prepper import DataPreparer
-from nparc_model import NPARCModel
+from nparc_model import ScaledNPARCModel
 import load_monocyte_cetsa_data as load
 import cetsa_paths
 import t_infl
+import permutation_test as ptest
 
 warnlogname = str(cetsa_paths.get_logging_path('cetsa_debug.log'))
 logging.basicConfig(filename=warnlogname, level=logging.DEBUG)
@@ -31,13 +32,13 @@ import seaborn
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas
-import numpy as np
+
 from scipy import stats
 
 RNG_SEED = time.time_ns()
 
 if platform.system() == 'Windows':
-    N_PROCS = 20
+    N_PROCS = multiproc.cpu_count() - 1
 elif platform.system() == 'Linux':
     import os
     proc_env_var = 'SLURM_CPUS_PER_TASK'
@@ -46,154 +47,51 @@ elif platform.system() == 'Linux':
         N_PROCS = int(procs_str)
     else:
         N_PROCS = 2
+
+
+def _perm_test_w(arg):
+    return _perm_test(*arg)
+
+def _perm_test(model, intab, outcol, treat, cat1, cat2, ident, n=50_000):
+    test = ptest.PermutationTest(model, intab, outcol, treat, cat1, cat2, ident)
+    return test.permutation_test(n=n)
+
+def permutation_tests(pool, models, intables, outcols, treatinfo, cats1, cats2, idents):
+    input_data = list(zip(models,
+                          intables,
+                          outcols,
+                          treatinfo,
+                          cats1,
+                          cats2,
+                          idents))
     
-
-def mse(predicteds, actuals):
-    diffs = actuals - predicteds
-    sqdif = diffs**2
-    sse = sqdif.sum()
-    return sse / len(predicteds)
-
-
-def ymax_logit(y_act_max, y_values):
-    return np.log(y_values) - np.log((y_act_max + 1) - y_values)
-
-
-def ymax_logit_mse(y_predicted, y_actuals):
-    y_act_max = max(y_actuals)
-    y_pred_logit = ymax_logit(y_act_max, y_predicted)
-    y_act_logit = ymax_logit(y_act_max, y_actuals)
-    return mse(y_pred_logit, y_act_logit)
-
-
-
-def _permutation_test(model, indata, outdata, treatdata, cat1, cat2, ident, rng, n=50_000):
+    pvals = []
+    pvalues_iter = pool.imap_unordered(
+        _perm_test_w, 
+        input_data,
+        1024)
+    for row in pvalues_iter:
+        pvals.append(row)
+        print(row)
     
-    # need to denote tables where we don't have the raw data
-    # required to even do permutation testing
-    # and skip them to further cut down on execution time
-    if indata[:,2].sum() == 0 or indata[:,3].sum() == 0:
-        pvalue = 1.0
-        interval = (0.0, 1.0)
-        return pvalue, *interval, 'data-insufficient', -1, ident, cat1, cat2
+    return pvals
 
-    base_pred = model.predict(indata)
-    neg_base_mse = -ymax_logit_mse(base_pred, outdata)
-    permuted_indata = indata.copy()
-
-    fast_better_count = 0
-    fast_mmts = np.empty((500,))
-    interact_permuted = np.empty_like(permuted_indata)
+def permutation_tests_iter(models, intables, outcols, treatinfo, cats1, cats2, idents):
+    input_data = list(zip(models,
+                          intables,
+                          outcols,
+                          treatinfo,
+                          cats1,
+                          cats2,
+                          idents))
     
-    for j in range(500):
-        cat1_permuted = rng.permutation(indata[:,2])
-        cat2_permuted = 1 - cat1_permuted
-        permuted_indata[:,2] = cat1_permuted
-        permuted_indata[:,3] = cat2_permuted
-
-        interact_permuted[:,0:4] = permuted_indata[:,0:4]
-        interact_permuted[:,4] = interact_permuted[:,1] * interact_permuted[:,2]
-        interact_permuted[:,5] = interact_permuted[:,1] * interact_permuted[:,3]
-        
-
-        permuted_pred = model.predict(interact_permuted)
-        neg_perm_mse = -ymax_logit_mse(permuted_pred, outdata)
-        
-        if neg_perm_mse >= neg_base_mse:
-            fast_better_count += 1
-        fast_mmts[j] = neg_perm_mse
+    pvals = []
+    for box in input_data:
+        pval = _perm_test_w(box)
+        print(pval)
+        pvals.append(pval)
     
-    fast_pvalue = (fast_better_count + 1) / (501)
-    if fast_pvalue > 0.1:
-        p_variance = fast_pvalue * (1 - fast_pvalue) / 500
-        interval = stats.norm.interval(0.95, fast_pvalue, p_variance)
-        return fast_pvalue, *interval, 'ecdf-faststop', -1, ident, cat1, cat2
-    
-    better_count = 0
-    mmts = np.empty((n,))
-    for i in range(n):
-        cat1_permuted = rng.permutation(indata[:,2])
-        cat2_permuted = 1 - cat1_permuted
-        permuted_indata[:,2] = cat1_permuted
-        permuted_indata[:,3] = cat2_permuted
-        
-        interact_permuted[:,0:4] = permuted_indata[:,0:4]
-        interact_permuted[:,4] = interact_permuted[:,1] * interact_permuted[:,2]
-        interact_permuted[:,5] = interact_permuted[:,1] * interact_permuted[:,3]
-        
-        permuted_pred = model.predict(interact_permuted)
-        neg_perm_mse = -ymax_logit_mse(permuted_pred, outdata)
-        if neg_perm_mse >= neg_base_mse:
-            better_count += 1
-        mmts[i] = neg_perm_mse
-
-    
-    if better_count >= 10:
-        p_value = (better_count + 1) / (n + 1)
-        p_variance = p_value * (1 - p_value) / n
-        interval = stats.norm.interval(0.95, p_value, p_variance)
-        return p_value, *interval, 'ecdf', -1, ident, cat1, cat2
-    
-    else:
-        sorted_measures = np.sort(mmts)
-        thresh_idx = -250
-        largest = sorted_measures[thresh_idx:]
-        thresh = (sorted_measures[thresh_idx - 1] + sorted_measures[thresh_idx]) / 2
-        exceeds = largest - thresh
-        gpd_params = stats.genpareto.fit(exceeds)
-        # use the 1-sample Kolmogorov-Smirnov test 
-        # to check whether the exceedances are from a GPD
-        test = stats.ks_1samp(exceeds, stats.genpareto.cdf, args=gpd_params)
-        iterations = 0
-        
-        # we want to have a GPD, which is KS null hypothesis
-        while test.pvalue < 0.05:
-            iterations += 1
-            thresh_idx += 10
-            if thresh_idx >= 0: # if we cannot find a GPD, fallback to basic method
-                p_value = (better_count + 1) / (n + 1)
-                p_variance = p_value * (1 - p_value) / n
-                interval = stats.norm.interval(0.95, p_value, p_variance)
-                return (better_count + 1) / (n + 1), *interval, 'ecdf-fallback', iterations, ident, cat1, cat2
-            largest = sorted_measures[thresh_idx:]
-            thresh = (sorted_measures[thresh_idx - 1] + sorted_measures[thresh_idx]) / 2
-            exceeds = largest - thresh
-            gpd_params = stats.genpareto.fit(exceeds)
-            test = stats.ks_1samp(exceeds, stats.genpareto.cdf, args=gpd_params)
-        
-        sf = stats.genpareto.sf(neg_base_mse - thresh, *gpd_params)
-        p_value = (len(exceeds) / n) * sf
-        
-        # calculate confidence interval using binomial distribution
-        count_low, count_high = stats.binom.interval(0.95, n, p_value)
-        low_bound = count_low / n
-        high_bound = count_high / n
-        
-        return p_value, low_bound, high_bound, 'gcd', iterations, ident, cat1, cat2
-    
-
-
-def _permutation_test_task(args, n=50_000):
-    rng = np.random.default_rng(RNG_SEED)
-    model, indata, outdata, treatdata, cat1, cat2, ident = args
-    return _permutation_test(model, indata, outdata, treatdata, cat1, cat2, ident, rng, n)
-
-
-def permutation_tests(models, intables, outcols, treatinfo, catlefts, catrights, idents):
-    arguments = list(zip(models,
-                         intables,
-                         outcols,
-                         treatinfo,
-                         catlefts,
-                         catrights,
-                         idents))
-    pvalues = []
-    with multiproc.Pool(N_PROCS) as pool:
-        pvalues_iter = pool.imap_unordered(_permutation_test_task, arguments, 256)
-        for row in pvalues_iter:
-            pvalues.append(row)
-            print(row)
-    return pvalues
+    return pvals
 
 def create_subtables(focused_data, dataprep):
     
@@ -263,13 +161,12 @@ def create_subtables(focused_data, dataprep):
 
 def _model_fit_task(model_inputs):
     interact_in, out = model_inputs
-    model = NPARCModel(alpha=0.0)
+    model = ScaledNPARCModel(alpha=0.0)
     model.fit(interact_in, out)
     return model
 
-def pfit_models(datapieces):
-    with multiproc.Pool(N_PROCS) as p:
-        models = p.map(_model_fit_task, datapieces)
+def pfit_models(pool, datapieces):
+    models = pool.map(_model_fit_task, datapieces)
     return models
 
 
@@ -346,43 +243,41 @@ def main(datapath=None, candidatepath=None, outdir=None):
     
     model_inputs = list(zip(in_datas, out_datas))
     
-    print("begin model fitting")
-    
-    models = pfit_models(model_inputs)
-    
-    print("models ready")
-    
-    prot_accessions = [p[0] for p in prot_idents]
-    gene_ids = [p[1] for p in prot_idents]
-    datatable = pandas.DataFrame({'PG.ProteinAccessions': prot_accessions,
-                                  'PG.Genes': gene_ids,
-                                  'Treatment 1' : cond_lefts,
-                                  'Treatment 2': cond_rights,
-                                  'model': models})
-    
-    print('started calculating inflection')
-    
     with multiproc.Pool(N_PROCS) as pool:
+    
+        print("begin model fitting")
+        models = pfit_models(pool, model_inputs)
+        print("models ready")
+        
+        prot_accessions = [p[0] for p in prot_idents]
+        gene_ids = [p[1] for p in prot_idents]
+        datatable = pandas.DataFrame({'PG.ProteinAccessions': prot_accessions,
+                                      'PG.Genes': gene_ids,
+                                      'Treatment 1' : cond_lefts,
+                                      'Treatment 2': cond_rights,
+                                      'model': models})
+        
+        print('started calculating inflection')
         t1_inflects = pool.map(t_infl.get_T1_inflection, models)
         t2_inflects = pool.map(t_infl.get_T2_inflection, models)
-    
-    print('finished calculating inflection')
-    
-    datatable.loc[:, 'T_infl_Treatment_1'] = t1_inflects
-    datatable.loc[:, 'T_infl_Treatment_2'] = t2_inflects
-    
-    datatable.loc[:,'converged'] = datatable['model'].map(lambda m : m.fit_success_)
-    
-    print('begin perm tests')
-    
-    perm_tests = permutation_tests(models,
-                                   in_datas,
-                                   out_datas,
-                                   treat_labels,
-                                   cond_lefts,
-                                   cond_rights,
-                                   prot_idents)
-    
+        datatable.loc[:, 'T_infl_Treatment_1'] = t1_inflects
+        datatable.loc[:, 'T_infl_Treatment_2'] = t2_inflects
+        print('finished calculating inflection')
+        
+        datatable.loc[:,'converged'] = datatable['model'].map(lambda m : m.fit_success_)
+        
+        print('begin perm tests')
+        
+        perm_tests = permutation_tests(pool,
+                                       models,
+                                       in_datas,
+                                       out_datas,
+                                       treat_labels,
+                                       cond_lefts,
+                                       cond_rights,
+                                       prot_idents)
+        print("perm tests finished")
+        
     perm_table = pandas.DataFrame(data=perm_tests,
                                   columns=['pvalue',
                                            'pvalue_lowbound',
@@ -473,15 +368,12 @@ def main(datapath=None, candidatepath=None, outdir=None):
                    dataprep.palette(),
                    outdir)
     
+    pool.close()
     
     return table
 
                   
 
 if __name__ == '__main__':
-    import time
-    start = time.time()
     alldata = main()
-    end = time.time()
-    elapsed = end - start
-    print(elapsed / 60)
+    
