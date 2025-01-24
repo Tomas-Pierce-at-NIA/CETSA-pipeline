@@ -5,83 +5,49 @@ Created on Mon Sep  9 16:02:19 2024
 @author: piercetf
 """
 
-from pathlib import Path
-import platform
-import os
+import pathlib
+import toml
 
-def get_userdir() -> Path:
-    if platform.system() == 'Windows':
-        userdir = os.environ['USERPROFILE']
-        return Path(userdir)
-    elif platform.system() == 'Linux':
-        userdir = os.environ['HOME']
-        datadir = userdir.replace('home', 'data')
-        return Path(datadir)
+def loadparams() -> dict:
+    configpath = pathlib.Path(__file__).with_name("cetsa_config.toml")
+    with configpath.open("r") as config:
+        params = toml.load(config)
+    return params
+
+def get_outdir() -> pathlib.Path:
+    params = loadparams()
+    return pathlib.Path(params['outputs']['outdir'])
+
+
+def get_candidates_filepath(cached=False) -> pathlib.Path:
+    params = loadparams()
+    if cached:
+        return pathlib.Path(params['inputs']['cached']['candidates'])
     else:
-        failsys()
-
-
-def get_outdir() -> Path:
-    if platform.system() == 'Windows':
-        userdir = get_userdir()
-        documents = userdir / 'Documents'
-        return documents
-    elif platform.system() == 'Linux':
-        datadir = get_userdir() / '2024_CETSA_MS' / 'outdata'
-        return datadir
-    else:
-        failsys()
-
-
-def failsys():
-    system = platform.system()
-    raise NotImplementedError("{} system is not supported".format(system))
-
-def get_candidates_filepath(cached=False) -> Path:
-    
-    if platform.system() == 'Windows':
-        if cached:
-            cachepath = r"C:\Users\piercetf\Projects\CachedCETSAData\Candidates.tsv"
-            return Path(cachepath)
-        else:
-            canonpath = r'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Candidates.tsv'
-            return Path(canonpath)
-    
-    elif platform.system() == 'Linux':
-        datadir = get_userdir()
-        candidate = datadir / "2024_CETSA_MS" / "indata" / "Candidates.tsv"
-        return candidate
-    else:
-        failsys()
+        return pathlib.Path(params['inputs']['uncached']['candidates'])
     
 
-def get_data_filepath(cached=False) -> Path:
-    if platform.system() == 'Windows':
-        if cached:
-            cachedpath = r"C:\Users\piercetf\Projects\CachedCETSAData\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv"
-            return Path(cachedpath)
-        else:
-            canonpath = r"T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv"
-            return Path(canonpath)
-    elif platform.system() == 'Linux':
-        datadir = get_userdir()
-        indata_dir = datadir / '2024_CETSA_MS' / 'indata'
-        indata_name = indata_dir / 'Complete_CETSA_analysis_w_F_37_4_Report_Delaney_Default_Normal.tsv'
-        return indata_name
+def get_data_filepath(cached=False) -> pathlib.Path:
+    params = loadparams()
+    if cached:
+        return pathlib.Path(params['inputs']['cached']['data'])
     else:
-        failsys()
+        return pathlib.Path(params['inputs']['uncached']['data'])
 
 
-def get_logging_path(logname) -> Path:
-    userdir = get_userdir()
-    if platform.system() == 'Windows':
-        logdir = userdir / 'Documents'
-        logfilename = logdir / logname
-        return logfilename
-    elif platform.system() == 'Linux':
-        return userdir / logname
-    else:
-        failsys()
+def get_logging_path(logname) -> pathlib.Path:
+    params = loadparams()
+    logdir = pathlib.Path(params['outputs']['logdir'])
+    return logdir / logname
 
 
 
+if __name__ == '__main__':
+    params = loadparams()
+    outdir = get_outdir()
+    can_cache = get_candidates_filepath(True)
+    can = get_candidates_filepath(False)
+    data_cache = get_data_filepath(True)
+    data = get_data_filepath(False)
+    logpath = get_logging_path('mylog.log')
+    

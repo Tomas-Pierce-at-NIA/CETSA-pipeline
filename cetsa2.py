@@ -13,7 +13,7 @@ import time
 import multiprocessing as multiproc
 import logging
 import platform
-
+import pathlib
 
 
 from data_prepper import DataPreparer
@@ -34,6 +34,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 import pandas
 
 from scipy import stats
+
+import toml
+
 
 RNG_SEED = time.time_ns()
 
@@ -110,9 +113,15 @@ def create_subtables(focused_data, dataprep):
     subtables = []
     
     treatments = set(focused_data['Treatment'])
-    treatments.remove('DMSO')
-    controls = {'DMSO', 'Myricetin'}
     
+    configpath = pathlib.Path(__file__).with_name("cetsa_config.toml")
+    with configpath.open("r") as config:
+        params = toml.load(config)
+    
+    v_control = params['controls']['vehicle']
+    nonsenolytics = set(params['controls']['nonsenolytic'])
+    treatments.remove(v_control)
+    controls = {v_control, *nonsenolytics}
     pairs = itertools.product(treatments, controls)
     depairs = filter(lambda x : x[0] != x[1], pairs)
     
