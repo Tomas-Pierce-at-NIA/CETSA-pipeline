@@ -22,7 +22,10 @@ def load_candidates(candidate_path = None):
                          'ProteinDescriptions',
                          'Genes',
                          'UniProtIds',
-                         '# Unique Total Peptides']
+                         '# Unique Total Peptides',
+                         'GO Biological Process',
+                         'GO Molecular Function',
+                         'GO Cellular Component']
     
     
     if candidate_path is None:
