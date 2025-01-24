@@ -1,0 +1,21 @@
+
+
+
+[controls]
+vehicle = "DMSO"
+nonsenolytic = ["Myricetin"]
+
+[outputs]
+outdir = 'C:\Users\piercetf\Documents'
+logdir = 'C:\Users\piercetf\Documents'
+
+[inputs]
+
+[inputs.cached]
+candidates = 'C:\Users\piercetf\Projects\CachedCETSAData\Candidates.tsv'
+data = 'C:\Users\piercetf\Projects\CachedCETSAData\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv'
+
+[inputs.uncached]
+candidates = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Candidates.tsv'
+data = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv'
+

@@ -7,7 +7,6 @@ Created on Tue Jan 21 22:02:59 2025
 
 import numpy as np
 from scipy import special, stats
-from sklearn import metrics
 import time
 
 class PermutationTest:
