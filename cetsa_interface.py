@@ -12,7 +12,9 @@ from tkinter import messagebox
 
 import multiprocessing as mp
 from pathlib import Path
-
+import enum
+import threading
+import queue
 
 import toml
 
@@ -171,11 +173,15 @@ class ConditionList(tk.Frame):
     
     def add_condition(self):
         text = self.__newtext.get()
-        identifier = self.listbox.insert("", "end", self.next_idx, text=text)
-        self.idents.append(identifier)
-        self.listbox.see(identifier)
-        self.next_idx += 1
-        self.cond_list.append(text)
+        if len(text) > 0:
+            identifier = self.listbox.insert("", "end", self.next_idx, text=text)
+            self.idents.append(identifier)
+            self.listbox.see(identifier)
+            self.next_idx += 1
+            self.cond_list.append(text)
+        else:
+            messagebox.showerror(title="Error",
+                                 message="Attempt to add empty condition to controls")
     
     
     def remove_condition(self):
@@ -339,6 +345,7 @@ class Config:
 
 
 def ita_wrapper():
+    print("ITA start imminent")
     candidatepath = cetsa_paths.candidate_filename()
     datapath = cetsa_paths.data_filename()
     outdir = cetsa_paths.get_outdir()
@@ -346,6 +353,46 @@ def ita_wrapper():
                       data_path=datapath, 
                       candidate_path=candidatepath)
     ita.run_analysis(data, can, outdir)
+    print("ITA run complete")
+
+
+def nparc_wrapper():
+    print("nparc start imminent")
+    cetsa2.main()
+    print("NPARC run complete")
+
+
+def run_analysis(task_queue, report_queue):
+    
+    while True:
+        
+        try:
+            taskid = task_queue.get(False)
+        except queue.Empty:
+            continue
+        
+        except ValueError:
+            break
+        
+        if taskid == Message.END:
+            return
+        
+        elif taskid == Message.START_ITA:
+            ita_wrapper()
+            report_queue.put(Message.FINISHED_ITA)
+            
+        elif taskid == Message.START_NPARC:
+            nparc_wrapper()
+            report_queue.put(Message.FINISHED_NPARC)
+
+
+class Message(enum.Enum):
+    
+    START_ITA = 0
+    START_NPARC = 1
+    END = 2
+    FINISHED_ITA = 3
+    FINISHED_NPARC = 4
 
 
     
@@ -354,6 +401,38 @@ def ui():
     
     configdata = Config()
     
+    taskq = mp.Queue()
+    
+    reportq = mp.Queue()
+    
+    starter_proc = mp.Process(target=run_analysis,
+                                      args=(taskq, reportq))
+    
+    starter_proc.start()
+    
+    def recheck_completion():
+        try:
+            reportid = reportq.get(False)
+        
+        except queue.Empty:
+            window.after(5_000, recheck_completion)
+            return
+        
+        except ValueError:
+            return
+        
+        if reportid == Message.FINISHED_ITA:
+            messagebox.showinfo(title="ITA complete",
+                                message="ITA analysis run has completed")
+            
+        
+        elif reportid == Message.FINISHED_NPARC:
+            messagebox.showinfo(title="NPARC complete",
+                                message="NPARC analysis run has completed")
+        
+        window.after(5_000, recheck_completion)
+    
+    window.after(20_000, recheck_completion)
     
     cachecheck = ttk.Checkbutton(window, variable=configdata.usecache, text='cached')
     datachoice = FilenameOpenChooser(window, 
@@ -393,16 +472,29 @@ def ui():
                                text="Display parameters",
                                command=configdata.display)
     
+    def end():
+        taskq.put(Message.END)
+        window.destroy()
+        taskq.close()
+        starter_proc.join()
+    
     quitbutton = ttk.Button(window,
                             text="Quit",
-                            command=window.destroy)
+                            command=end)
     
-    runbutton = ttk.Button(window,
-                           text="Run",
-                           command=messagebox.showinfo(
-                               title="Not implemented",
-                               message="Running has not been implemented")
-                           )
+    def send_run_msg():
+        configdata.ready_config()
+        if configdata.method.get() == MethodChooser.COMBO_T_TEST:
+            taskq.put(Message.START_ITA)
+            messagebox.showinfo(title="ITA",
+                                message="ITA analysis started")
+        elif configdata.method.get() == MethodChooser.NPARC:
+            taskq.put(Message.START_NPARC)
+            messagebox.showinfo(title="NPARC",
+                                message="NPARC analysis started")
+    
+    
+    runbutton = ttk.Button(window,text="Run",command=send_run_msg)
     
     
     #cachecheck.grid(row=0, column=0)
@@ -424,8 +516,10 @@ def ui():
     
     window.title("SenoCETSA")
     window.mainloop()
+    starter_proc.join()
 
 
 if __name__ == '__main__':
     ui()
+    pass
 

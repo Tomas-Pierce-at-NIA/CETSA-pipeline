@@ -308,12 +308,14 @@ def main(datapath=None, candidatepath=None, outdir=None):
                                  'Treatment 2'])
     
     #data2, candidates = load.prepare_data
-    candidates2 = load.load_candidates(candidatepath)
+    data2, candidates2 = load.load_candidates(candidatepath)
+    del data2
     
-    breakpoint()
     
     if outdir is None:
         outdir = cetsa_paths.get_outdir()
+        
+    conditions = table['Treatment 1'].unique()
     
     outpath = outdir / 'nparc_outputs_Oct2024.csv'
     
