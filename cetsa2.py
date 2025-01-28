@@ -307,6 +307,11 @@ def main(datapath=None, candidatepath=None, outdir=None):
                                  'Treatment 1',
                                  'Treatment 2'])
     
+    #data2, candidates = load.prepare_data
+    candidates2 = load.load_candidates(candidatepath)
+    
+    breakpoint()
+    
     if outdir is None:
         outdir = cetsa_paths.get_outdir()
     

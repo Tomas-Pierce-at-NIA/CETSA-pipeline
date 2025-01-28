@@ -8,6 +8,30 @@ Created on Mon Sep  9 16:02:19 2024
 import pathlib
 import toml
 
+
+
+def candidate_filename() -> pathlib.Path:
+    params = loadparams()
+    if params['inputs']['use_cache']:
+        return pathlib.Path(params['inputs']['cached']['candidates'])
+    else:
+        return pathlib.Path(params['inputs']['uncached']['candidates'])
+    
+
+
+def data_filename() -> pathlib.Path:
+    params = loadparams()
+    if params['inputs']['use_cache']:
+        return pathlib.Path(params['inputs']['cached']['data'])
+    else:
+        return pathlib.Path(params['inputs']['uncached']['data'])
+
+
+
+def paramfilename() -> pathlib.Path:
+    return pathlib.Path(__file__).with_name("cetsa_config.toml")
+
+
 def loadparams() -> dict:
     configpath = pathlib.Path(__file__).with_name("cetsa_config.toml")
     with configpath.open("r") as config:

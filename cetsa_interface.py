@@ -8,14 +8,20 @@ Created on Tue Nov 12 16:10:56 2024
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
+from tkinter import messagebox
 
+import multiprocessing as mp
 from pathlib import Path
 
+
+import toml
 
 import cetsa_paths
 import CETSA_individual_temperature as ita
 import cetsa2
 import load_monocyte_cetsa_data as load
+
+
 
 
 class FsChooser(tk.Frame):
@@ -85,9 +91,8 @@ class FilenameOpenChooser(FsChooser):
 
 class MethodChooser(tk.Frame):
     
-    NOT_SET = 0
     COMBO_T_TEST = 1
-    NPARC = 2
+    NPARC = 0
     
     def __init__(self, master, variable):
         tk.Frame.__init__(self, master)
@@ -115,91 +120,310 @@ class MethodChooser(tk.Frame):
         return self.variable.get()
 
 
-def run(method, datapath, candidatepath, outpath):
+class ConditionList(tk.Frame):
     
-    datafile = Path(datapath)
-    candidatefile = Path(candidatepath)
-    outdir = Path(outpath)
+    def __init__(self, master, titletxt, addtxt, condlist):
+        super().__init__(master)
+        
+        self.idents = []
+        self.next_idx = 0
+        self.cond_list = condlist
+        
+        self.label = ttk.Label(self, text=titletxt)
+        self.scrollbar = ttk.Scrollbar(self)
+        self.listbox = ttk.Treeview(self, 
+                                    yscrollcommand=self.scrollbar.set,
+                                    show="tree")
+        self.scrollbar.configure(command=self.listbox.yview)
+        
+        self.__newtext = tk.StringVar()
+        
+        self.addlabel = ttk.Label(self, text=addtxt)
+        self.textbox = ttk.Entry(self, textvariable=self.__newtext)
+        
+        
+        self.add_button = ttk.Button(self, 
+                                     text='Add condition',
+                                     command=self.add_condition)
+        
+        self.remove_button = ttk.Button(self,
+                                        text="Remove condition",
+                                        command=self.remove_condition)
+        
+        self.label.grid(row=0, column=0, columnspan=4, sticky='W')
+        self.scrollbar.grid(row=1, column=4, rowspan=4)
+        self.listbox.grid(row=1, column=0, columnspan=4, rowspan=4)
+        self.addlabel.grid(row=5, column=0, columnspan=4, sticky='W')
+        self.textbox.grid(row=6, column=0, columnspan=4, sticky='W')
+        self.add_button.grid(row=7, column=0, columnspan=2)
+        self.remove_button.grid(row=7, column=2, columnspan=2)
+        
+        
+        self.__condition_add_initial()
     
-    if method == MethodChooser.NOT_SET:
-        print("no method set")
-        return
+    def __condition_add_initial(self):
+        for item in self.cond_list:
+            identifier = self.listbox.insert("", "end", self.next_idx, text=item)
+            self.idents.append(identifier)
+            self.listbox.see(identifier)
+            self.next_idx += 1
     
-    elif method == MethodChooser.COMBO_T_TEST:
-        data, candidates = load.prepare_data(False, datafile, candidatefile)
-        ita.run_analysis(data, candidates, 'student', datadir=outdir)
-        return
     
-    elif method == MethodChooser.NPARC:
-        #data, candidates = load.prepare_data(False, datafile, candidatefile)
-        cetsa2.main(datafile, candidatefile, outdir)
-        return
+    def add_condition(self):
+        text = self.__newtext.get()
+        identifier = self.listbox.insert("", "end", self.next_idx, text=text)
+        self.idents.append(identifier)
+        self.listbox.see(identifier)
+        self.next_idx += 1
+        self.cond_list.append(text)
     
-    else:
-        print("unknown method set : {}".format(method))
-        return
+    
+    def remove_condition(self):
+        if len(self.idents) > 0:
+            last = self.idents.pop()
+            self.listbox.delete(last)
+            self.cond_list.pop()
+        else:
+            messagebox.showerror(title="Error",
+                                 message="No condition to remove")
 
 
+class ConditionEntry(tk.Frame):
+    
+    def __init__(self, master, variable, titletxt):
+        super().__init__(master)
+        
+        self.variable = variable
+        
+        self.label = ttk.Label(self, text=titletxt)
+        self.entry = ttk.Entry(self, textvariable=self.variable)
+        
+        self.label.grid(row=0, column=0, sticky='W')
+        self.entry.grid(row=1, column=0, sticky='W')
+    
+    def get(self):
+        return self.variable.get()
+
+
+class Config:
+    
+    def __init__(self):
+        self.__prev_vcontrol = None
+        self.__prev_nscontrols = None
+        self.__prev_outdir = None
+        self.__prev_logdir = None
+        self.__prev_cachedata = None
+        self.__prev_cachecandidate = None
+        self.__prev_unc_data = None
+        self.__prev_unc_candidate = None
+        self.__use_cached = None
+        self.load_prev()
+        
+        self.vcontrol = tk.StringVar()
+        self.ns_controls = []
+        self.outdir = tk.StringVar()
+        self.logdir = tk.StringVar()
+        self.data = tk.StringVar()
+        self.candidate = tk.StringVar()
+        self.usecache = tk.BooleanVar()
+        self.use_prev()
+        #self.use_cached()
+        
+        self.method = tk.IntVar()
+    
+    
+    def display(self):
+        print("vehicle", self.vcontrol.get())
+        print("nonsenolytics", self.ns_controls)
+        print("outdir", self.outdir.get())
+        print("logdir", self.logdir.get())
+        print("data", self.data.get())
+        print("candidate", self.candidate.get())
+        print("use cache", self.usecache.get())
+        print("method", self.method.get())
+    
+    
+    @property
+    def default_logdir(self):
+        return self.__prev_logdir
+    
+    
+    @property
+    def default_outdir(self):
+        return self.__prev_outdir
+    
+    @property
+    def default_data(self):
+        return self.__prev_cachedata
+    
+    
+    @property
+    def default_candidate(self):
+        return self.__prev_cachecandidate
+    
+    
+    def ready_config(self):
+        path = cetsa_paths.paramfilename()
+        use_cache = self.usecache.get()
+        data = {
+            'title' : "CETSA pipeline configuration file",
+            'controls': {
+                'vehicle': self.vcontrol.get(),
+                'nonsenolytic': self.ns_controls
+                },
+            'outputs': {
+                'outdir': self.outdir.get(),
+                'logdir': self.logdir.get()
+                },
+            'inputs': {'use_cache': use_cache}
+            }
+        if use_cache:
+            data['inputs']['cached'] = {
+                'data': self.data.get(),
+                'candidates': self.candidate.get()
+                }
+            data['inputs']['uncached'] = {
+                'data': self.data.get(),
+                'candidates': self.candidate.get()
+                }
+        
+        else:
+            data['inputs']['cached'] = {
+                'data': self.data.get(),
+                'candidates': self.candidate.get()
+                }
+            data['inputs']['uncached'] = {
+                'data': self.data.get(),
+                'candidates': self.candidate.get()
+                }
+        
+        with open(path, 'w') as confighandle:
+            toml.dump(data, confighandle)
+    
+    
+    
+    def use_prev(self):
+        self.vcontrol.set(self.__prev_vcontrol)
+        self.ns_controls = self.__prev_nscontrols[:]
+        self.outdir.set(self.__prev_outdir)
+        self.logdir.set(self.__prev_logdir)
+        self.data.set(self.__prev_unc_data)
+        self.candidate.set(self.__prev_unc_candidate)
+        self.usecache.set(self.__use_cached)
+    
+    
+    def use_cached(self):
+        self.data.set(self.__prev_cachedata)
+        self.candidate.set(self.__prev_cachecandidate)
+        self.usecache.set(True)
+    
+    
+    def use_uncached(self):
+        self.data.set(self.__prev_unc_data)
+        self.candidate.set(self.__prev_cachecandidate)
+        self.usecache.set(False)
+    
+    
+    def load_prev(self):
+        oldparams = cetsa_paths.loadparams()
+        self.__prev_vcontrol = oldparams['controls']['vehicle']
+        self.__prev_nscontrols = oldparams['controls']['nonsenolytic']
+        self.__prev_outdir = oldparams['outputs']['outdir']
+        self.__prev_logdir = oldparams['outputs']['logdir']
+        self.__prev_cachedata = oldparams['inputs']['cached']['data']
+        self.__prev_cachecandidate = oldparams['inputs']['cached']['candidates']
+        self.__prev_unc_data = oldparams['inputs']['uncached']['data']
+        self.__prev_unc_candidate = oldparams['inputs']['uncached']['candidates']
+        self.__use_cached = oldparams['inputs']['use_cache']
+        
+
+
+def ita_wrapper():
+    candidatepath = cetsa_paths.candidate_filename()
+    datapath = cetsa_paths.data_filename()
+    outdir = cetsa_paths.get_outdir()
+    data, can = load.prepare_data(display=False, 
+                      data_path=datapath, 
+                      candidate_path=candidatepath)
+    ita.run_analysis(data, can, outdir)
+
+
+    
 def ui():
-
-    window = tk.Tk(screenName="CETSA Pipeline")
+    window = tk.Tk()
     
-    window.title("CETSA Pipelines")
+    configdata = Config()
     
-    approach = tk.IntVar(value=MethodChooser.NOT_SET)
     
-    method_choose = MethodChooser(window, approach)
+    cachecheck = ttk.Checkbutton(window, variable=configdata.usecache, text='cached')
+    datachoice = FilenameOpenChooser(window, 
+                                     "data", 
+                                     configdata.data,
+                                     defaultpath=configdata.default_data)
+    candidatechoice = FilenameOpenChooser(window,
+                                          "candidate",
+                                          configdata.candidate,
+                                          defaultpath=configdata.default_candidate)
     
-    candidate_filepath = tk.StringVar()
+    outdirchoice = FolderOpenChooser(window,
+                                     "output",
+                                     configdata.outdir,
+                                     defaultpath=configdata.default_outdir)
     
-    data_filepath = tk.StringVar()
+    logdirchoice = FolderOpenChooser(window,
+                                     "log",
+                                     configdata.logdir,
+                                     defaultpath=configdata.default_logdir)
     
-    outdir_filepath = tk.StringVar()
+    vehicleentry = ConditionEntry(window, 
+                                  configdata.vcontrol, 
+                                  "Vehicle control")
     
-    def showdata():
-        print(approach.get())
-        print(candidate_filepath.get())
-        print(data_filepath.get())
-        print(outdir_filepath.get())
+    nonsenolyticlist = ConditionList(window,
+                                     'Nonsenolytic controls',
+                                     'Nonsenolytic',
+                                     configdata.ns_controls)
     
-    candidate_ask = FilenameOpenChooser(window, 
-                                        "Candidate", 
-                                        candidate_filepath,
-                                        defaultpath=cetsa_paths.get_candidates_filepath(False))
+    titlelabel = ttk.Label(window,
+                           text="SenoCETSA graphical user interface")
     
-    data_ask = FilenameOpenChooser(window,
-                                   "Data",
-                                   data_filepath,
-                                   defaultpath=cetsa_paths.get_data_filepath(False))
+    methodchoice = MethodChooser(window, configdata.method)
     
-    out_ask = FolderOpenChooser(window,
-                                "Output",
-                                outdir_filepath,
-                                defaultpath=str(cetsa_paths.get_outdir())
-                                )
+    displaybutton = ttk.Button(window,
+                               text="Display parameters",
+                               command=configdata.display)
     
-    quit_but = ttk.Button(window, command=window.destroy, text="Quit")
+    quitbutton = ttk.Button(window,
+                            text="Quit",
+                            command=window.destroy)
     
-    debug_but = ttk.Button(window, command=showdata, text="Debug")
+    runbutton = ttk.Button(window,
+                           text="Run",
+                           command=messagebox.showinfo(
+                               title="Not implemented",
+                               message="Running has not been implemented")
+                           )
     
-    run_but = ttk.Button(window, 
-                         command=lambda:run(approach.get(),
-                                            data_filepath.get(),
-                                            candidate_filepath.get(),
-                                            outdir_filepath.get()),
-                         text="Run")
     
-    candidate_ask.pack()
-    data_ask.pack()
-    out_ask.pack()
-    method_choose.pack()
-    run_but.pack()
-    debug_but.pack()
-    quit_but.pack()
+    #cachecheck.grid(row=0, column=0)
+    titlelabel.grid(row=0, column=0, columnspan=5)
+    quitbutton.grid(row=1, column=1)
+    cachecheck.grid(row=1, column=2)
+    datachoice.grid(row=2,column=1, columnspan=2)
+    candidatechoice.grid(row=3, column=1, columnspan=2)
+    outdirchoice.grid(row=4, column=1, columnspan=2)
+    logdirchoice.grid(row=5, column=1, columnspan=2)
     
+    methodchoice.grid(row=6, column=1)
+    
+    vehicleentry.grid(row=1, column=3, columnspan=2, sticky='W')
+    nonsenolyticlist.grid(row=2, column=3, columnspan=2, rowspan=6)
+    
+    displaybutton.grid(row=7, column=1)
+    runbutton.grid(row=7, column=2)
+    
+    window.title("SenoCETSA")
     window.mainloop()
-    
-
 
 
 if __name__ == '__main__':
