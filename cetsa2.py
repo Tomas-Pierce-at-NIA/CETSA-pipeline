@@ -308,83 +308,65 @@ def main(datapath=None, candidatepath=None, outdir=None):
                                  'Treatment 2'])
     
     #data2, candidates = load.prepare_data
-    data2, candidates2 = load.load_candidates(candidatepath)
+    data2, candidates2 = load.prepare_data(False, datapath, candidatepath)
     del data2
     
     
     if outdir is None:
         outdir = cetsa_paths.get_outdir()
         
-    conditions = table['Treatment 1'].unique()
     
-    outpath = outdir / 'nparc_outputs_Oct2024.csv'
-    
-    
-    fisetin = table.loc[table['Treatment 1'] == 'Fisetin', :].copy()
-    
-    quercetin = table.loc[table['Treatment 1'] == 'Quercetin', :].copy()
-    
-    myricetin = table.loc[table['Treatment 1'] == 'Myricetin',:].copy()
     
     table.loc[:, 'bh_pval'] = stats.false_discovery_control(table['pvalue'])
+    table.to_csv(outdir / 'nparc_outputs_Oct2024.csv')
     
-    table.to_csv(outpath)
+    conditions = table['Treatment 1'].unique()
     
-    fisetin.loc[:, 'bh_pval'] = stats.false_discovery_control(fisetin['pvalue'])
+    configparams = cetsa_paths.loadparams()
     
-    quercetin.loc[:, 'bh_pval'] = stats.false_discovery_control(quercetin['pvalue'])
+    nonsenolytics = configparams['controls']['nonsenolytic']
     
-    myricetin.loc[:, 'bh_pval'] = stats.false_discovery_control(myricetin['pvalue'])
+    # set of genes which interact with nonsenolytic controls
+    ns_genes = set()
     
-    fisetinpath = outdir / 'nparc_fisetin_Oct2024.csv'
+    for non_seno in nonsenolytics:
+        nonseno_nospace = non_seno.replace(' ', '_')
+        nstable = table.loc[table['Treatment 1'] == non_seno, :].copy()
+        nstable.loc[:, 'bh_pval'] = stats.false_discovery_control(nstable['pvalue'])
+        filename = 'nparc_nscontrol_{}_Jan2025.csv'.format(nonseno_nospace)
+        filepath = outdir / filename
+        nstable.to_csv(filepath)
+        ns_sig = nstable.loc[nstable['bh_pval'] < 0.05, :]
+        sig_genes = ns_sig['PG.Genes']
+        ns_genes.update(sig_genes)
+        
+        
     
-    quercetinpath = outdir / 'nparc_quercetin_Oct2024.csv'
+    for condition in conditions:
+        cond_nospace = condition.replace(" ", "_")
+        cond_table = table.loc[table['Treatment 1'] == condition, :].copy()
+        cond_table.loc[:, 'bh_pval'] = stats.false_discovery_control(cond_table['pvalue'])
+        filename = 'nparc_{}_Jan2025.csv'.format(cond_nospace)
+        filepath = outdir / filename
+        cond_table.to_csv(filepath)
+        sig_table = cond_table.loc[cond_table['bh_pval'] < 0.05, :]
+        sigfilename = 'nparc_sig_{}_Jan2025.csv'.format(cond_nospace)
+        sigpath = outdir / sigfilename
+        sig_table.to_csv(sigpath)
+        unshared = sig_table.loc[~sig_table['PG.Genes'].isin(ns_genes), :]
+        unshare_filename = 'nparc_unshare_{}_Jan2025.csv'.format(cond_nospace)
+        unshare_path = outdir / unshare_filename
+        unshared.to_csv(unshare_path)
+        
+        graphname = "nparc_Jan2025_{}.pdf".format(cond_nospace)
+        display_graphs(graphname,
+                       unshared,
+                       narrow_data,
+                       dataprep,
+                       dataprep.palette(),
+                       outdir)
     
-    myricetinpath = outdir / 'nparc_myricetin_Oct2024.csv'
-    
-    fisetin.to_csv(fisetinpath)
-    
-    quercetin.to_csv(quercetinpath)
-    
-    myricetin.to_csv(myricetinpath)
-    
-    sig_fisetin = fisetin.loc[fisetin['bh_pval'] < 0.05, :]
-    
-    sig_quercetin = quercetin.loc[quercetin['bh_pval'] < 0.05, :]
-    
-    sig_myricetin = myricetin.loc[myricetin['bh_pval'] < 0.05, :]
-    
-    sig_fisetin.to_csv(outdir / 'nparc_sig_fisetin_Oct2024.csv')
-    
-    sig_quercetin.to_csv(outdir / 'nparc_sig_quercetin_Oct2024.csv')
-    
-    sig_myricetin.to_csv(outdir / 'nparc_sig_myricetin_Oct2024.csv')
-    
-    myr_genes = set(sig_myricetin['PG.Genes'])
-    
-    unshared_fisetin = sig_fisetin.loc[~sig_fisetin['PG.Genes'].isin(myr_genes), :]
-    
-    unshared_quercetin = sig_quercetin.loc[~sig_quercetin['PG.Genes'].isin(myr_genes), :]
-    
-    unshared_fisetin.to_csv(outdir / 'nparc_unshared_fisetin_Oct2024.csv')
-    
-    unshared_quercetin.to_csv(outdir / 'nparc_unshared_quercetin_Oct2024.csv')
-    
-    display_graphs("nparc_Oct2024_fisetin.pdf", 
-                   unshared_fisetin, 
-                   narrow_data, 
-                   dataprep, 
-                   dataprep.palette(),
-                   outdir)
-    
-    display_graphs("nparc_Oct2024_quercetin.pdf", 
-                   unshared_quercetin, 
-                   narrow_data, 
-                   dataprep, 
-                   dataprep.palette(),
-                   outdir)
-    
-    pool.close()
+
     
     return table
 
