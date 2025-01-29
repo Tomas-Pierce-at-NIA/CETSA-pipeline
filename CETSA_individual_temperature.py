@@ -424,59 +424,44 @@ def run_analysis(data, candidates, datadir=None):
     sigtable.to_csv(datadir / "ITA_signif_comps_Student_Oct2024.csv")
     all_info.to_csv(datadir / "ITA_all_comps_Student_Oct2024.csv")
     
-    fisetin1 = sigtable.loc[(sigtable['Treatment'] == 'Fisetin') & (sigtable['Control'] == 'DMSO'),:]
-    fisetin2 = sigtable.loc[(sigtable['Treatment'] == 'Fisetin') & (sigtable['Control'] == 'Myricetin'),:]
+    params = cetsa_paths.loadparams()
     
-    quercetin1 = sigtable.loc[(sigtable['Treatment'] == 'Quercetin') & (sigtable['Control'] == 'DMSO'),:]
-    quercetin2 = sigtable.loc[(sigtable['Treatment'] == 'Quercetin')&(sigtable['Control']=='Myricetin'),:]
+    conditions = all_info['Treatment'].unique()
     
-    myricetin = sigtable.loc[(sigtable['Treatment'] == 'Myricetin'),:]
+    ns_controls = params['controls']['nonsenolytic']
+    v_control = params['controls']['vehicle']
+    controls = [v_control, *ns_controls]
     
-    myr_genes = set(myricetin['PG.Genes'])
+    ns_genes = set()
+    for ns_control in ns_controls:
+        ns_table = sigtable.loc[sigtable['Treatment'] == ns_control, :]
+        ns_genes.update(ns_table['PG.Genes'])
     
-    fisetin_all = pandas.concat([fisetin1, fisetin2])
-    quercetin_all = pandas.concat([quercetin1, quercetin2])
+    for condition in conditions:
+        cond_nospace = condition.replace(" ", "_")
+        cond_table = sigtable.loc[sigtable['Treatment'] == condition, :]
+        cond_unshare = cond_table.loc[~cond_table['PG.Genes'].isin(ns_genes),:]
+        cond_fname = datadir / "ITA_un_{}_Jan2025.csv".format(cond_nospace)
+        cond_unshare.to_csv(cond_fname)
+        
+        for control in controls:
+            pair_tab = cond_table.loc[cond_table['Control'] == control, :]
+            fname = datadir / "ITA_{}_v_{}_Jan2025.pdf".format(condition, 
+                                                               control)
+            graph_all_proteins(data,
+                               students,
+                               pair_tab,
+                               fname,
+                               condition,
+                               control)
+        
     
-    fisetin_all = fisetin_all.loc[~fisetin_all['PG.Genes'].isin(myr_genes),:]
-    quercetin_all = quercetin_all.loc[~quercetin_all['PG.Genes'].isin(myr_genes),:]
-    
-    fisetin_all.to_csv(datadir / "ITA_fisetin_Student_Oct2024.csv")
-    quercetin_all.to_csv(datadir / "ITA_quercetin_Student_Oct2024.csv")
-    
-    graph_all_proteins(data,
-                       students,
-                       fisetin1,
-                       datadir / "ITA_fisetinVDMSO_Student_Oct2024.pdf",
-                       'Fisetin',
-                       'DMSO')
-    
-    graph_all_proteins(data,
-                       students,
-                       fisetin2,
-                       datadir / "ITA_fisetinVmyricetin_Student_Oct2024.pdf",
-                       'Fisetin',
-                       'Myricetin')
-    
-    graph_all_proteins(data,
-                       students,
-                       quercetin1,
-                       datadir / "ITA_quercetinVDMSO_Student_Oct2024.pdf",
-                       'Quercetin',
-                       'DMSO')
-    
-    graph_all_proteins(data,
-                       students,
-                       quercetin2,
-                       datadir / "ITA_quercetinVmyricetin_Student_Oct2024.pdf",
-                       'Quercetin',
-                       'Myricetin')
-    
-    return fisetin_all, quercetin_all
+    return all_info
         
 
 
 if __name__ == '__main__':
     
     data, candidates = load.prepare_data(False)
-    stud_fis, stud_quer = run_analysis(data, candidates)
+    results = run_analysis(data, candidates)
 
