@@ -289,98 +289,6 @@ def graph_all_proteins(data, all_comps, focus, filename, treatment, control):
     return
 
 
-def auc_all_proteins(data: pandas.DataFrame) -> pandas.DataFrame:
-    """
-    Calculates change in area under curve between each pair of
-    treatment, control conditions.
-    Currently considered suspect for not being consistent
-    with same approach implemented via Excel.
-    Computes area-under-curve using trapezoidal approximation.
-    """
-    
-    table = []
-    
-    for prot_name, prot_table in data.groupby(by=['PG.ProteinAccessions',
-                                                  'PG.Genes']):
-        mean_table = prot_table.groupby(by=['Temperature',
-                                            'Treatment']
-                                        ).mean(numeric_only=True).reset_index()
-        
-        dmso = mean_table.loc[mean_table['Treatment'] == 'DMSO', :]
-        fisetin = mean_table.loc[mean_table['Treatment'] == 'Fisetin', :]
-        quercetin = mean_table.loc[mean_table['Treatment'] == 'Quercetin', :]
-        myricetin = mean_table.loc[mean_table['Treatment'] == 'Myricetin', :]
-        
-        dmso_auc = integrate.trapezoid(dmso[NORMPROT], 
-                                       x=dmso['Temperature'])
-        fisetin_auc = integrate.trapezoid(fisetin[NORMPROT],
-                                          x=fisetin['Temperature'])
-        quercetin_auc = integrate.trapezoid(quercetin[NORMPROT], 
-                                            x=quercetin['Temperature'])
-        myricetin_auc = integrate.trapezoid(myricetin[NORMPROT], 
-                                            x=myricetin['Temperature'])
-        
-        fisetin_delta_auc = fisetin_auc - dmso_auc
-        quercetin_delta_auc = quercetin_auc - dmso_auc
-        myricetin_delta_auc = myricetin_auc - dmso_auc
-        
-        fisetin_r_auc = fisetin_auc / dmso_auc
-        quercetin_r_auc = quercetin_auc / dmso_auc
-        myricetin_r_auc = myricetin_auc / dmso_auc
-        
-        fisetin_delta2_auc = fisetin_auc - myricetin_auc
-        quercetin_delta2_auc = quercetin_auc - myricetin_auc
-        myricetin_delta2_auc = myricetin_auc - myricetin_auc
-        
-        fisetin_r2_auc = fisetin_auc / myricetin_auc
-        quercetin_r2_auc = quercetin_auc / myricetin_auc
-        myricetin_r2_auc = myricetin_auc / myricetin_auc
-        
-        
-        
-        
-        rowf = (*prot_name, 
-                'Fisetin', 
-                fisetin_auc, 
-                fisetin_delta_auc,
-                fisetin_r_auc,
-                fisetin_delta2_auc,
-                fisetin_r2_auc)
-        rowq = (*prot_name, 
-                'Quercetin', 
-                quercetin_auc, 
-                quercetin_delta_auc,
-                quercetin_r_auc,
-                quercetin_delta2_auc,
-                quercetin_r2_auc)
-        rowm = (*prot_name, 
-                'Myricetin', 
-                myricetin_auc, 
-                myricetin_delta_auc,
-                myricetin_r_auc,
-                myricetin_delta2_auc,
-                myricetin_r2_auc)
-        
-        table.append(rowf)
-        table.append(rowq)
-        table.append(rowm)
-    
-    frame = pandas.DataFrame(table,
-                             columns=['PG.ProteinAccessions',
-                                      'PG.Genes',
-                                      'Treatment',
-                                      'AUC',
-                                      'diff AUC vs control',
-                                      'fold change AUC vs control',
-                                      'diff AUC vs Myricetin',
-                                      'fold change AUC vs Myricetin'])
-    
-    frame.loc[:, 'log_fold_change_auc'] = np.log(frame['fold change AUC vs control'])
-    
-    frame.loc[:, 'logfold_myricetin'] = np.log(frame['fold change AUC vs Myricetin'])
-    
-    return frame
-
 
 def run_analysis(data, candidates, datadir=None):
     """
@@ -393,12 +301,8 @@ def run_analysis(data, candidates, datadir=None):
     students = get_all_student_tests(data)
     students = students.loc[students['Temperature'] > 37, :]
     combo_students = collect_students(students)
-    auc_table = auc_all_proteins(data)
-    combo_stats = combo_students.merge(auc_table,
-                                       how='left',
-                                       on=['PG.ProteinAccessions',
-                                           'PG.Genes',
-                                           'Treatment'])
+
+    combo_stats = combo_students
     
     good_combo_stats = combo_stats.dropna(subset=['combo_student_pvalue'])
     
