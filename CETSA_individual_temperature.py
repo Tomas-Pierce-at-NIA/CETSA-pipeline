@@ -35,9 +35,14 @@ def get_all_student_tests(data: pandas.DataFrame) -> pandas.DataFrame:
     protein-temperature-treatment-control combination.
     """
     conditions = set(data['Treatment'])
-    controls = {'DMSO', 'Myricetin'}
-    treatments = list(conditions.difference(controls))
-    treatments.append('Myricetin')
+    
+    params = cetsa_paths.loadparams()
+    v_control = params['controls']['vehicle']
+    ns_controls = params['controls']['nonsenolytic']
+    
+    controls = [v_control, *ns_controls]
+    
+    treatments = conditions.difference({v_control})
     
     groups = data.groupby(by=['PG.ProteinAccessions',
                               'PG.Genes'])
