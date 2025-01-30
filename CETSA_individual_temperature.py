@@ -356,7 +356,7 @@ def run_analysis(data, candidates, datadir=None):
         cond_unshare.to_csv(cond_fname)
         
         for control in controls:
-            pair_tab = cond_table.loc[cond_table['Control'] == control, :]
+            pair_tab = cond_unshare.loc[cond_unshare['Control'] == control, :]
             fname = datadir / "ITA_{}_v_{}_Jan2025.pdf".format(condition, 
                                                                control)
             graph_all_proteins(data,
