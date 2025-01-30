@@ -347,6 +347,8 @@ def run_analysis(data, candidates, datadir=None):
         ns_genes.update(ns_table['PG.Genes'])
     
     for condition in conditions:
+        if condition in ns_controls:
+            continue
         cond_nospace = condition.replace(" ", "_")
         cond_table = sigtable.loc[sigtable['Treatment'] == condition, :]
         cond_unshare = cond_table.loc[~cond_table['PG.Genes'].isin(ns_genes),:]
