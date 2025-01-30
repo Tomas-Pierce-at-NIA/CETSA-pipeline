@@ -11,9 +11,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 
 import multiprocessing as mp
-from pathlib import Path
 import enum
-import threading
 import queue
 
 import toml
