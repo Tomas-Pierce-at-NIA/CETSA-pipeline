@@ -5,6 +5,7 @@ Created on Tue Nov 12 16:10:56 2024
 @author: piercetf
 """
 
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -518,6 +519,7 @@ def ui():
 
 
 if __name__ == '__main__':
+    mp.freeze_support()
     ui()
-    pass
+
 

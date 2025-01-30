@@ -60,9 +60,13 @@ def get_data_filepath(cached=False) -> pathlib.Path:
 
 
 def get_logging_path(logname) -> pathlib.Path:
+    here = pathlib.Path(__file__)
     params = loadparams()
     logdir = pathlib.Path(params['outputs']['logdir'])
-    return logdir / logname
+    if logdir.exists():
+        return logdir / logname
+    else:
+        return here.with_name(logname)
 
 
 
