@@ -40,7 +40,7 @@ dotplot(orep3, title="Fisetin BP")
 dbs <- c("Pfam_InterPro_Domains", "Pfam_Domains_2019", "InterPro_Domains_2019",
          "Reactome_2022", "Reactome_Pathways_2024", "KEGG_2019_Human")
 
-fis_enrich <- enrichr(table2$PG.Genes, dbs)
+fis_enrich <- enrichr(table2$PG.Genes, dbs, background=table1$PG.Genes)
 
 plotEnrich(fis_enrich[[1]], title="Pfam InterPro Fisetin")
 

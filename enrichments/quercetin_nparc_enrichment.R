@@ -40,7 +40,7 @@ dotplot(orep3)
 dbs <- c("Pfam_InterPro_Domains", "Pfam_Domains_2019", "InterPro_Domains_2019",
          "Reactome_2022", "Reactome_Pathways_2024", "KEGG_2019_Human")
 
-quer_enrich <- enrichr(table2$PG.Genes, dbs)
+quer_enrich <- enrichr(table2$PG.Genes, dbs, background=table1$PG.Genes)
 
 plotEnrich(quer_enrich[[1]], title="Pfam InterPro Quercetin")
 
