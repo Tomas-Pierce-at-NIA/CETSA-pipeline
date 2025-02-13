@@ -55,7 +55,7 @@ orep1 <- enrichGO(table2_idents$ENTREZID,
                   ont='MF', 
                   universe=table1_idents$ENTREZID)
 
-dotplot(orep1, title="Quercetin MF")
+dotplot(orep1, title="Quercetin Molecular Function")
 
 orep2 <- enrichGO(table2_idents$ENTREZID, 
                   'org.Hs.eg.db',

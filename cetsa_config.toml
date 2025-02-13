@@ -5,16 +5,16 @@ vehicle = "DMSO"
 nonsenolytic = [ "Myricetin",]
 
 [outputs]
-outdir = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\SenoCETSA_outputs'
-logdir = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\SenoCETSA_outputs'
+outdir = "C:/Users/piercetf/Projects/senocetsa_outputs"
+logdir = "C:/Users/piercetf/Projects/senocetsa_outputs"
 
 [inputs]
 use_cache = false
 
 [inputs.cached]
-data = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv'
-candidates = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Candidates.tsv'
+data = "C:/Users/piercetf/Projects/CachedCETSAData/Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv"
+candidates = "C:/Users/piercetf/Projects/CachedCETSAData/Candidates.tsv"
 
 [inputs.uncached]
-data = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv'
-candidates = 'T:\TGB\LSS\TGU\Users\Tomas\2024_CETSA_MS\Monocyte_CETSA_Statistical_Analysis\CETSA_ind_temp_analysis_starting_files\Candidates.tsv'
+data = "C:/Users/piercetf/Projects/CachedCETSAData/Complete CETSA analysis w F-37-4_Report_Delaney_Default (Normal).tsv"
+candidates = "C:/Users/piercetf/Projects/CachedCETSAData/Candidates.tsv"

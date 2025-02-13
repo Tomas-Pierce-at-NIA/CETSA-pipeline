@@ -2,19 +2,18 @@ library(clusterProfiler)
 library(enrichR)
 library(org.Hs.eg.db)
 
-table1 <- read.csv(r"(C:\Users\piercetf\Projects\senocetsa_outputs\nparc_Fisetin_Jan2025.csv)")
-table2 <- read.csv(r"(C:\Users\piercetf\Projects\senocetsa_outputs\nparc_unshare_Fisetin_Jan2025.csv)")
+table2 <- read.csv(
+  r"(C:\Users\piercetf\Projects\senocetsa_outputs\ITA_un_Fisetin_Jan2025.csv)"
+  )
 
-# database enrichment
+table1 <- read.csv(
+  r"(C:\Users\piercetf\Projects\senocetsa_outputs\ITA_all_comps_Student_Oct2024.csv)"
+)
 
 dbs <- c("Pfam_InterPro_Domains", "Pfam_Domains_2019", "InterPro_Domains_2019",
          "Reactome_2022", "Reactome_Pathways_2024", "KEGG_2019_Human")
 
-fis_enrich <- enrichr(table2$PG.Genes, dbs, background=table1$PG.Genes)
-
-pfam_interpro_fisetin <- fis_enrich[[1]]
-
-interpo_fis <- fis_enrich[[3]]
+fis_enrich <- enrichr(table2$PG.Genes, dbs, background=unique(table1$PG.Genes))
 
 plotEnrich(fis_enrich[[1]], 
            title="Pfam InterPro Fisetin",
@@ -40,7 +39,6 @@ plotEnrich(fis_enrich[[6]],
            title="kegg",
            orderBy="Adjusted.P.value")
 
-
 # convert identities for GO enrichment
 
 table1_idents <- bitr(table1$PG.ProteinAccessions, 
@@ -52,8 +50,6 @@ table2_idents <- bitr(table2$PG.ProteinAccessions,
                       "UNIPROT",
                       "ENTREZID",
                       "org.Hs.eg.db")
-
-# enrich for GO ontology and plot enrichments
 
 orep1 <- enrichGO(table2_idents$ENTREZID, 
                   'org.Hs.eg.db',
@@ -75,4 +71,6 @@ orep3 <- enrichGO(table2_idents$ENTREZID,
                   universe=table1_idents$ENTREZID)
 
 dotplot(orep3, title="Fisetin BP")
+
+
 

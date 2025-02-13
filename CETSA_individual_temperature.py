@@ -330,8 +330,8 @@ def run_analysis(data, candidates, datadir=None):
     sigtable.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
     all_info.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
     
-    sigtable.to_csv(datadir / "ITA_signif_comps_Student_Oct2024.csv")
-    all_info.to_csv(datadir / "ITA_all_comps_Student_Oct2024.csv")
+    sigtable.to_csv(datadir / "ITA_signif_comps_Student_Jan2025.csv")
+    all_info.to_csv(datadir / "ITA_all_comps_Student_Jan2025.csv")
     
     params = cetsa_paths.loadparams()
     

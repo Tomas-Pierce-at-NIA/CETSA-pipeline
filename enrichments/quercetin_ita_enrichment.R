@@ -2,46 +2,41 @@ library(clusterProfiler)
 library(enrichR)
 library(org.Hs.eg.db)
 
-table1 <- read.csv(r"(C:\Users\piercetf\Projects\senocetsa_outputs\nparc_Fisetin_Jan2025.csv)")
-table2 <- read.csv(r"(C:\Users\piercetf\Projects\senocetsa_outputs\nparc_unshare_Fisetin_Jan2025.csv)")
+table1 <- read.csv(r"(C:\Users\piercetf\Projects\senocetsa_outputs\ITA_all_comps_Student_Oct2024.csv)")
+table2 <- read.csv(r"(C:\Users\piercetf\Projects\senocetsa_outputs\ITA_un_Quercetin_Jan2025.csv)")
 
 # database enrichment
 
 dbs <- c("Pfam_InterPro_Domains", "Pfam_Domains_2019", "InterPro_Domains_2019",
          "Reactome_2022", "Reactome_Pathways_2024", "KEGG_2019_Human")
 
-fis_enrich <- enrichr(table2$PG.Genes, dbs, background=table1$PG.Genes)
+quer_enrich <- enrichr(table2$PG.Genes, dbs, background=unique(table1$PG.Genes))
 
-pfam_interpro_fisetin <- fis_enrich[[1]]
-
-interpo_fis <- fis_enrich[[3]]
-
-plotEnrich(fis_enrich[[1]], 
-           title="Pfam InterPro Fisetin",
+plotEnrich(quer_enrich[[1]], 
+           title="Pfam InterPro Quercetin",
            orderBy="Adjusted.P.value")
 
-plotEnrich(fis_enrich[[2]], 
-           title="Pfam Fisetin",
+plotEnrich(quer_enrich[[2]], 
+           title="Pfam Quercetin",
            orderBy="Adjusted.P.value")
 
-plotEnrich(fis_enrich[[3]], 
-           title="InterPro Fisetin",
+plotEnrich(quer_enrich[[3]], 
+           title="InterPro Quercetin",
            orderBy="Adjusted.P.value")
 
-plotEnrich(fis_enrich[[4]], 
+plotEnrich(quer_enrich[[4]], 
            title="reactome 1",
            orderBy="Adjusted.P.value")
 
-plotEnrich(fis_enrich[[5]], 
+plotEnrich(quer_enrich[[5]], 
            title="reactome 2",
            orderBy="Adjusted.P.value")
 
-plotEnrich(fis_enrich[[6]], 
+plotEnrich(quer_enrich[[6]], 
            title="kegg",
            orderBy="Adjusted.P.value")
 
-
-# convert identities for GO enrichment
+# convert IDs for GO
 
 table1_idents <- bitr(table1$PG.ProteinAccessions, 
                       "UNIPROT",
@@ -53,26 +48,27 @@ table2_idents <- bitr(table2$PG.ProteinAccessions,
                       "ENTREZID",
                       "org.Hs.eg.db")
 
-# enrich for GO ontology and plot enrichments
+# GO enrichment
 
 orep1 <- enrichGO(table2_idents$ENTREZID, 
                   'org.Hs.eg.db',
                   ont='MF', 
                   universe=table1_idents$ENTREZID)
 
-dotplot(orep1, title="Fisetin Molecular Function")
+dotplot(orep1, title="Quercetin Molecular Function")
 
 orep2 <- enrichGO(table2_idents$ENTREZID, 
                   'org.Hs.eg.db',
                   ont='CC', 
                   universe=table1_idents$ENTREZID)
 
-dotplot(orep2, title="Fisetin Cellular Compartment")
+dotplot(orep2)
 
 orep3 <- enrichGO(table2_idents$ENTREZID, 
                   'org.Hs.eg.db',
                   ont='BP', 
                   universe=table1_idents$ENTREZID)
 
-dotplot(orep3, title="Fisetin BP")
+dotplot(orep3)
+
 
