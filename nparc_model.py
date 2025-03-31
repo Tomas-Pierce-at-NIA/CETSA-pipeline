@@ -160,12 +160,16 @@ class NPARCModel(ModelBase):
         self.X_ = X
         self.y_ = y
         self.n_features_in_ = X.shape[1]
+        hess_inv_op = fit_res.hess_inv
+        identity = np.identity(hess_inv_op.shape[0])
+        self.inv_hess_ = hess_inv_op @ identity
         return self
     
     def predict(self, X: np.ndarray) -> np.ndarray:
         super().predict(X)
         return _predict(self.params_, X)
-
+    
+    
 
 class ScaledNPARCModel(NPARCModel):
     
@@ -212,10 +216,10 @@ if __name__ == '__main__':
             pass
             
         #model = NPARCModel()
-        model = ScaledNPARCModel()
+        model = ScaledNPARCModel(alpha=1e-6)
         model.fit(ins, outs)
         pds = model.predict(ins)
-        rng = np.random.default_rng((start + i % 97))
+        #rng = np.random.default_rng((start + i % 97))
         i += 1
         perm_test = ptest.PermutationTest(model,
                                           ins,
@@ -225,7 +229,10 @@ if __name__ == '__main__':
                                           'DMSO',
                                           ident)
         test = perm_test.permutation_test()
-        #p = _permutation_test(model, ins, outs, treats, 'Quercetin', 'DMSO', ident, rng, 50_000)
+        
+        if i > 7:
+            break
+        
         print(i)
         print(test)
 

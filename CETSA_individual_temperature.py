@@ -194,7 +194,7 @@ def graph_all_proteins(data, all_comps, focus, filename, treatment, control):
     x-axis and outputs adjusted p-value in bottom-right corner.
     """
     
-    treatments = ['DMSO', 'Fisetin', 'Quercetin', 'Myricetin']
+    treatments = ['DMSO', 'Fisetin', 'Myricetin', 'Quercetin']
     
     colors = seaborn.color_palette('hls', len(treatments))
     palette = dict(zip(treatments, colors))
