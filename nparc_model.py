@@ -178,7 +178,23 @@ class NPARCModel(ModelBase):
         else:
             return f"{cname}(not fitted)"
     
+    @property
+    def treatment1_decreasing(self):
+        if self.__sklearn_is_fitted__():
+            sumparam = self.params_[2] + self.params_[5]
+            return sumparam < 0
+        else:
+            raise NotFittedError("tried to check if treatment 1 decreasing before fit")
     
+    @property
+    def treatment2_decreasing(self):
+        if self.__sklearn_is_fitted__():
+            sumparam = self.params_[2] + self.params_[6]
+            return sumparam < 0
+        else:
+            raise NotFittedError("tried to check if treatment 2 decreasing before fit")
+
+
 
 class ScaledNPARCModel(NPARCModel):
     

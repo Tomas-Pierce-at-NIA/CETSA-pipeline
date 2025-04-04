@@ -275,6 +275,9 @@ def main(datapath=None, candidatepath=None, outdir=None):
         
         datatable.loc[:,'converged'] = datatable['model'].map(lambda m : m.fit_success_)
         
+        datatable.loc[:, 'T1_Decreasing'] = datatable['model'].map(lambda m : m.treatment1_decreasing)
+        datatable.loc[:, 'T2_Decreasing'] = datatable['model'].map(lambda m : m.treatment2_decreasing)
+        
         print('begin perm tests')
         
         perm_tests = permutation_tests(pool,
