@@ -174,7 +174,7 @@ class NPARCModel(ModelBase):
         
         if self.__sklearn_is_fitted__():
             paramstr = str(self.params_)
-            return f"{cname}(w={paramstr},α={self.alpha})"
+            return f"{cname}(w={paramstr};α={self.alpha})".replace('\n', ' ')
         else:
             return f"{cname}(not fitted)"
     
