@@ -169,6 +169,15 @@ class NPARCModel(ModelBase):
         super().predict(X)
         return _predict(self.params_, X)
     
+    def __str__(self):
+        cname = type(self).__name__
+        
+        if self.__sklearn_is_fitted__():
+            paramstr = str(self.params_)
+            return f"{cname}(w={paramstr},α={self.alpha})"
+        else:
+            return f"{cname}(not fitted)"
+    
     
 
 class ScaledNPARCModel(NPARCModel):
