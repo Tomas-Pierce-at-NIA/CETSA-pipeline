@@ -163,7 +163,14 @@ class NPARCModel(ModelBase):
         hess_inv_op = fit_res.hess_inv
         identity = np.identity(hess_inv_op.shape[0])
         self.inv_hess_ = hess_inv_op @ identity
+        self.final_loss_ = fit_res.fun
         return self
+    
+    def bic(self):
+        # loss is negative log likelihood already
+        k = len(self.params_)
+        n = len(self.y_)
+        return k * np.ln(n) + 2 * self.final_loss_
     
     def predict(self, X: np.ndarray) -> np.ndarray:
         super().predict(X)
