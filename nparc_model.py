@@ -9,6 +9,8 @@ import warnings
 import numpy as np
 from scipy import optimize
 from scipy import special
+from scipy import linalg
+from scipy import stats
 from sklearn.base import BaseEstimator
 from sklearn.utils import validation
 from sklearn.exceptions import DataConversionWarning, NotFittedError
@@ -172,6 +174,17 @@ class NPARCModel(ModelBase):
         n = len(self.y_)
         return k * np.ln(n) + 2 * self.final_loss_
     
+    @property
+    def hessian(self):
+        if hasattr(self, 'hess_'):
+            return self.hess_
+        elif hasattr(self, 'inv_hess_'):
+            hess = linalg.inv(self.inv_hess_)
+            self.hess_ = hess
+            return self.hess_
+        else:
+            raise NotFittedError("Attempted to get final hessian before model fitted")
+    
     def predict(self, X: np.ndarray) -> np.ndarray:
         super().predict(X)
         return _predict(self.params_, X)
@@ -213,9 +226,66 @@ class ScaledNPARCModel(NPARCModel):
     def predict(self, X: np.ndarray) -> np.ndarray:
         small_preds = super().predict(X)
         return small_preds * self.y_max_
-    
 
+
+
+class AwareScaledModel(ScaledNPARCModel):
+    
+    def marginal_density_approx_laplace(self):
+        d = len(self.params_)
+        covar = -self.inv_hess_
+        det_covar = linalg.det(covar)
+        sqrt_det = np.sqrt(det_covar)
+        mined_nll = self.final_loss_
+        maxed_lh = np.exp(-mined_nll)
         
+        # using following priors
+        # p ~ Beta(1, 8)
+        # w1 ~ Exponential(1) temperature is scaled but should still be positive
+        # w2 ~ N(0, 5) 
+        # w3 ~ N(0, 1) offset parameter can go either direction
+        # w4 ~ N(0, 1)
+        # w5 ~ N(0, 1)
+        # w6 ~ N(0, 1)
+        
+        p_prior = stats.beta.pdf(self.params_[0], a=1, b=8)
+        w1_prior = stats.expon.pdf(self.params_[1], scale=1) # 1/1 = 1
+        w2_prior = stats.norm.pdf(self.params_[2], loc=0, scale=5)
+        w3_prior = stats.norm.pdf(self.params_[3], loc=0, scale=1)
+        w4_prior = stats.norm.pdf(self.params_[4], loc=0, scale=1)
+        w5_prior = stats.norm.pdf(self.params_[5], loc=0, scale=1)
+        w6_prior = stats.norm.pdf(self.params_[6], loc=0, scale=1)
+        
+        prior = p_prior * w1_prior * w2_prior * w3_prior * w4_prior * w5_prior * w6_prior
+        
+        coef = 2 * (np.pi**(d/2))
+        
+        return coef * sqrt_det * maxed_lh * prior
+
+
+class NullScaledModel(ScaledNPARCModel):
+    
+    def null_marginal_density_approx_laplace(self):
+        d = len(self.params_)
+        covar = -self.inv_hess_
+        det_covar = linalg.det(covar)
+        sqrt_det = np.sqrt(det_covar)
+        mined_nll = self.final_loss_
+        maxed_lh = np.exp(-mined_nll)
+        # using following priors
+        # p ~ Beta(1, 8)
+        # w1 ~ Exponential(1) temperature is scaled but should still be positive
+        # w2 ~ N(0, 5) 
+        # null models lack treatment-specific parameters
+        p_prior = stats.beta.pdf(self.params_[0], a=1, b=8)
+        w1_prior = stats.expon.pdf(self.params_[1], scale=1) # 1/1 = 1
+        w2_prior = stats.norm.pdf(self.params_[2], loc=0, scale=5)
+        
+        prior = p_prior * w1_prior * w2_prior
+        
+        coef = 2 * (np.pi**(d/2))
+        
+        return coef * sqrt_det * maxed_lh * prior
 
 
 if __name__ == '__main__':
