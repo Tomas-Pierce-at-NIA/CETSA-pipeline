@@ -140,6 +140,8 @@ def create_subtables(focused_data, dataprep):
             
             null_indatas, _, _, _ = dataprep.null_model_cols_transform(focused_data, cond1, cond2)
             
+            #breakpoint()
+            
             prots = prot_ids.reset_index()
             reset_treat = treatdatas.reset_index()
             reset_focused = focused_data.reset_index()
