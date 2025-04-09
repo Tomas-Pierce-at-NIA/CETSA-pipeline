@@ -288,6 +288,12 @@ class NullScaledModel(ScaledNPARCModel):
         return coef * sqrt_det * maxed_lh * prior
 
 
+def calc_bayes_factor(alt_model, null_model):
+    alt_margin = AwareScaledModel.marginal_density_approx_laplace(alt_model)
+    null_margin = NullScaledModel.null_marginal_density_approx_laplace(null_model)
+    return alt_margin / null_margin
+
+
 if __name__ == '__main__':
     
     import permutation_test as ptest

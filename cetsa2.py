@@ -17,7 +17,7 @@ import pathlib
 
 
 from data_prepper import DataPreparer
-from nparc_model import ScaledNPARCModel
+from nparc_model import ScaledNPARCModel, calc_bayes_factor
 import load_monocyte_cetsa_data as load
 import cetsa_paths
 import t_infl
@@ -111,6 +111,7 @@ def create_subtables(focused_data, dataprep):
     cond2s = []
     prot_identities = []
     subtables = []
+    null_inputs = []
     
     treatments = set(focused_data['Treatment'])
     
@@ -136,6 +137,9 @@ def create_subtables(focused_data, dataprep):
     for cond1, cond2 in depairs:
         try:
             indatas, outdatas, treatdatas, prot_ids = dataprep.transform(focused_data, cond1, cond2)
+            
+            null_indatas, _, _, _ = dataprep.null_model_cols_transform(focused_data, cond1, cond2)
+            
             prots = prot_ids.reset_index()
             reset_treat = treatdatas.reset_index()
             reset_focused = focused_data.reset_index()
@@ -148,6 +152,8 @@ def create_subtables(focused_data, dataprep):
                 prot_id = prot[0]
                 prot_table = reset_focused.loc[idx]
                 
+                null_indata = null_indatas[idx, :]
+                
                 inputs.append(indata)
                 outputs.append(outdata)
                 treats.append(treatdata)
@@ -155,6 +161,7 @@ def create_subtables(focused_data, dataprep):
                 cond2s.append(cond2)
                 prot_identities.append(prot_id)
                 subtables.append(prot_table)
+                null_inputs.append(null_indata)
                 
         except Exception as e:
             raise e
@@ -165,7 +172,8 @@ def create_subtables(focused_data, dataprep):
             cond1s,
             cond2s,
             prot_identities,
-            subtables)
+            subtables,
+            null_inputs)
     
 
 def _model_fit_task(model_inputs):
@@ -248,9 +256,11 @@ def main(datapath=None, candidatepath=None, outdir=None):
     
     prepped_info = create_subtables(narrow_data, dataprep)
     
-    in_datas, out_datas, treat_labels, cond_lefts, cond_rights, prot_idents, subtables = prepped_info
+    in_datas, out_datas, treat_labels, cond_lefts, cond_rights, prot_idents, subtables, null_inputs = prepped_info
     
     model_inputs = list(zip(in_datas, out_datas))
+    
+    nullmodel_inputs = list(zip(null_inputs, out_datas))
     
     with multiproc.Pool(N_PROCS) as pool:
     
@@ -258,20 +268,33 @@ def main(datapath=None, candidatepath=None, outdir=None):
         models = pfit_models(pool, model_inputs)
         print("models ready")
         
+        print("begin null model fitting")
+        null_models = pfit_models(pool, nullmodel_inputs)
+        print("null models ready")
+        
+        print("begin calculating bayes factors")
+        bfactors = [calc_bayes_factor(alt, null) for alt, null in zip(models, null_models)]
+        print("bayes factors ready")
+        
+        
+        
+        print('started calculating inflection')
+        t1_inflects = pool.map(t_infl.get_T1_inflection, models)
+        t2_inflects = pool.map(t_infl.get_T2_inflection, models)
+        #datatable.loc[:, 'T_infl_Treatment_1'] = t1_inflects
+        #datatable.loc[:, 'T_infl_Treatment_2'] = t2_inflects
+        print('finished calculating inflection')
+        
         prot_accessions = [p[0] for p in prot_idents]
         gene_ids = [p[1] for p in prot_idents]
         datatable = pandas.DataFrame({'PG.ProteinAccessions': prot_accessions,
                                       'PG.Genes': gene_ids,
                                       'Treatment 1' : cond_lefts,
                                       'Treatment 2': cond_rights,
-                                      'model': models})
-        
-        print('started calculating inflection')
-        t1_inflects = pool.map(t_infl.get_T1_inflection, models)
-        t2_inflects = pool.map(t_infl.get_T2_inflection, models)
-        datatable.loc[:, 'T_infl_Treatment_1'] = t1_inflects
-        datatable.loc[:, 'T_infl_Treatment_2'] = t2_inflects
-        print('finished calculating inflection')
+                                      'model': models,
+                                      'T_infl_Treatment_1' : t1_inflects,
+                                      'T_infl_Treatment_2' : t2_inflects,
+                                      'Bayes_factors': bfactors})
         
         datatable.loc[:,'converged'] = datatable['model'].map(lambda m : m.fit_success_)
         
