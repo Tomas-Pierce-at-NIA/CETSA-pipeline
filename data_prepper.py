@@ -64,6 +64,6 @@ class DataPreparer:
                                                                   category1,
                                                                   category2]])
         col_count = 2 # bias + temp
-        nh_data = interact_vars[:, col_count]
+        nh_data = interact_vars[:, :col_count]
         outputs = focal_data[NORMPROT].to_numpy()
         return nh_data, outputs, treatments, prot_ids
