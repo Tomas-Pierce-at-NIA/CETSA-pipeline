@@ -233,8 +233,8 @@ class AwareScaledModel(ScaledNPARCModel):
     
     def marginal_density_approx_laplace(self):
         d = len(self.params_)
-        covar = -self.inv_hess_
-        det_covar = linalg.det(covar)
+        #covar = -self.inv_hess_
+        det_covar = linalg.det(self.inv_hess_)
         sqrt_det = np.sqrt(det_covar)
         mined_nll = self.final_loss_
         maxed_lh = np.exp(-mined_nll)
@@ -289,6 +289,7 @@ class NullScaledModel(ScaledNPARCModel):
 
 
 def calc_bayes_factor(alt_model, null_model):
+    breakpoint()
     alt_margin = AwareScaledModel.marginal_density_approx_laplace(alt_model)
     null_margin = NullScaledModel.null_marginal_density_approx_laplace(null_model)
     return alt_margin / null_margin
