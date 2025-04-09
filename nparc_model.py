@@ -233,7 +233,7 @@ class AwareScaledModel(ScaledNPARCModel):
     
     def marginal_density_approx_laplace(self):
         d = len(self.params_)
-        #covar = -self.inv_hess_
+        
         det_covar = linalg.det(self.inv_hess_)
         sqrt_det = np.sqrt(det_covar)
         mined_nll = self.final_loss_
@@ -267,8 +267,8 @@ class NullScaledModel(ScaledNPARCModel):
     
     def null_marginal_density_approx_laplace(self):
         d = len(self.params_)
-        covar = -self.inv_hess_
-        det_covar = linalg.det(covar)
+        
+        det_covar = linalg.det(self.inv_hess_)
         sqrt_det = np.sqrt(det_covar)
         mined_nll = self.final_loss_
         maxed_lh = np.exp(-mined_nll)
