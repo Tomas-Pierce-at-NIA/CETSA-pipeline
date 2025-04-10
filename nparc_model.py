@@ -291,7 +291,7 @@ class NullScaledModel(ScaledNPARCModel):
 def calc_bayes_factor(alt_model, null_model):
     alt_margin = AwareScaledModel.marginal_density_approx_laplace(alt_model)
     null_margin = NullScaledModel.null_marginal_density_approx_laplace(null_model)
-    return alt_margin / null_margin
+    return (alt_margin + 1e-20) / (null_margin + 1e-20)
 
 
 if __name__ == '__main__':
