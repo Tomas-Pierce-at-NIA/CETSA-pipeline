@@ -249,7 +249,10 @@ class AwareScaledModel(ScaledNPARCModel):
         # w6 ~ N(0, 1)
         
         p_prior = stats.beta.pdf(self.params_[0], a=1, b=8)
-        w1_prior = stats.expon.pdf(self.params_[1], scale=1) # 1/1 = 1
+        #w1_prior = stats.expon.pdf(self.params_[1], scale=1) # 1/1 = 1
+        # temperature is scaled so effect could go either direction,
+        # and may be obligated to be negative due to the model specification
+        w1_prior = stats.norm.pdf(self.params_[1], loc=0, scale=5)
         w2_prior = stats.norm.pdf(self.params_[2], loc=0, scale=5)
         w3_prior = stats.norm.pdf(self.params_[3], loc=0, scale=1)
         w4_prior = stats.norm.pdf(self.params_[4], loc=0, scale=1)
@@ -278,7 +281,8 @@ class NullScaledModel(ScaledNPARCModel):
         # w2 ~ N(0, 5) 
         # null models lack treatment-specific parameters
         p_prior = stats.beta.pdf(self.params_[0], a=1, b=8)
-        w1_prior = stats.expon.pdf(self.params_[1], scale=1) # 1/1 = 1
+        #w1_prior = stats.expon.pdf(self.params_[1], scale=1) # 1/1 = 1
+        w1_prior = stats.norm.pdf(self.params_[1], loc=0, scale=5) # see above
         w2_prior = stats.norm.pdf(self.params_[2], loc=0, scale=5)
         
         prior = p_prior * w1_prior * w2_prior
