@@ -279,7 +279,6 @@ def main(datapath=None, candidatepath=None, outdir=None):
         print("bayes factors ready")
         
         
-        
         print('started calculating inflection')
         t1_inflects = pool.map(t_infl.get_T1_inflection, models)
         t2_inflects = pool.map(t_infl.get_T2_inflection, models)
