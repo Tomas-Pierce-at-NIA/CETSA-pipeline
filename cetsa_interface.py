@@ -14,6 +14,7 @@ from tkinter import messagebox
 import multiprocessing as mp
 import enum
 import queue
+import pathlib
 
 import toml
 
@@ -396,7 +397,12 @@ class Message(enum.Enum):
 
     
 def ui():
+    
+    iconpath = pathlib.Path(__file__).with_name("icons") / "SenoCETSAicon_notext.ico"
+    
     window = tk.Tk()
+    
+    window.iconbitmap(str(iconpath))
     
     configdata = Config()
     
