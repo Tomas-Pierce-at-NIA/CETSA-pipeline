@@ -5,7 +5,8 @@ pyinstaller --name SenoCETSA^
   --add-data "README.md:."^
   --add-data "LICENSE:."^
   --add-data "cetsa_config.toml:."^
-  --add-data "icons:."^
+  --add-data "icons:icons"^
   --hide-console minimize-early^
+  --icon "icons/SenoCETSAicon_notext.ico"^
   cetsa_interface.py
   
