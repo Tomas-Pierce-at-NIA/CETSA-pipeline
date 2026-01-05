@@ -5,8 +5,8 @@ vehicle = "DMSO"
 nonsenolytic = [ "Myricetin",]
 
 [outputs]
-outdir = "C:/Users/piercetf/Projects/senocetsa_outputs2"
-logdir = "C:/Users/piercetf/Projects/senocetsa_outputs2"
+outdir = "C:/Users/piercetf/Projects/senocetsa_outputs4"
+logdir = "C:/Users/piercetf/Projects/senocetsa_outputs4"
 
 [inputs]
 use_cache = false

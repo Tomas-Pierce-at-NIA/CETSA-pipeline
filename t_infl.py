@@ -8,7 +8,7 @@ Created on Wed Sep 25 15:51:26 2024
 
 from scipy import optimize
 import sympy
-from nparc_model import NPARCModel
+from nparc_model import NPARCModel, ScaledNPARCModel
 from typing import Callable
 
 # analytic derivative is computationally expensive,
@@ -34,6 +34,38 @@ expit = 1 / (1 + sympy.exp(-_z))
 analytic_form = expit - (p * expit) + p
 analytic_form = analytic_form.simplify()
 analytic_derivative = analytic_form.diff(t)
+
+analytic_integral = analytic_form.integrate(t)
+
+
+def analytic_integ(model :NPARCModel, treatment :int) -> Callable[[float], float]:
+    params = model.params_
+    
+    substitutes = [(p, params[0]),
+                   (b0, params[1]),
+                   (w_t, params[2]),
+                   (w_c1, params[3]),
+                   (w_c2, params[4]),
+                   (w_tc1, params[5]),
+                   (w_tc2, params[6])]
+    if treatment == 1:
+        substitutes.extend([(c1, 1),
+                            (c2, 0)])
+    elif treatment == 2:
+        substitutes.extend([(c1, 0),
+                            (c2, 1)])
+    
+    withnum_integral = analytic_integral.subs(substitutes)
+    as_func = sympy.lambdify(t, withnum_integral)
+    return as_func
+
+def get_delta_s(model :ScaledNPARCModel) -> float:
+    anti_deriv_t1 = analytic_integ(model, 1)
+    anti_deriv_t2 = analytic_integ(model, 2)
+    t1_area = anti_deriv_t1(1) - anti_deriv_t1(0)
+    t2_area = anti_deriv_t2(1) - anti_deriv_t2(0)
+    return t1_area - t2_area
+
 
 def analytic_deriv(model :NPARCModel, treatment :int) -> Callable[[float], float]:
     
@@ -80,7 +112,8 @@ if __name__ == '__main__':
     import cProfile
     import load_monocyte_cetsa_data as load
     from data_prepper import DataPreparer
-    from nparc_model import NPARCModel
+    from nparc_model import ScaledNPARCModel
+    
     
     data, can = load.prepare_data()
     profile = cProfile.Profile()
@@ -92,17 +125,22 @@ if __name__ == '__main__':
                 break
             try:
                 dprep = DataPreparer(table)
-                inputs, outputs, treats = dprep.transform(table, 'Fisetin', 'DMSO')
-                model = NPARCModel()
+                inputs, outputs, treats, prot_ids = dprep.transform(table, 'Fisetin', 'DMSO')
+                model = ScaledNPARCModel()
                 model.fit(inputs, outputs)
+                
+                #assert False
             except ValueError:
                 continue
             except KeyError:
                 continue
-            profile.runcall(get_T1_inflection, model)
+            #profile.runcall(get_T1_inflection, model)
             profile.runcall(get_T2_inflection, model)
+            profile.runcall(get_delta_s, model)
             i += 1
+            #break
     finally:
+        profile.disable()
         print("preparing to dump")
         profile.dump_stats(r"C:\Users\piercetf\Documents\t_infl.profile")
         print("dumped")

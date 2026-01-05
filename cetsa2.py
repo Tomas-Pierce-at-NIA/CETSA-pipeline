@@ -286,6 +286,10 @@ def main(datapath=None, candidatepath=None, outdir=None):
         #datatable.loc[:, 'T_infl_Treatment_2'] = t2_inflects
         print('finished calculating inflection')
         
+        print("start calculating delta auc")
+        delta_auc = pool.map(t_infl.get_delta_s, models)
+        print("finish calculating delta auc")
+        
         prot_accessions = [p[0] for p in prot_idents]
         gene_ids = [p[1] for p in prot_idents]
         datatable = pandas.DataFrame({'PG.ProteinAccessions': prot_accessions,
@@ -295,7 +299,8 @@ def main(datapath=None, candidatepath=None, outdir=None):
                                       'model': models,
                                       'T_infl_Treatment_1' : t1_inflects,
                                       'T_infl_Treatment_2' : t2_inflects,
-                                      'Bayes_factors': bfactors})
+                                      'Bayes_factors': bfactors,
+                                      'Delta AUC': delta_auc})
         
         datatable.loc[:,'converged'] = datatable['model'].map(lambda m : m.fit_success_)
         
@@ -360,7 +365,7 @@ def main(datapath=None, candidatepath=None, outdir=None):
         nonseno_nospace = non_seno.replace(' ', '_')
         nstable = table.loc[table['Treatment 1'] == non_seno, :].copy()
         nstable.loc[:, 'bh_pval'] = stats.false_discovery_control(nstable['pvalue'])
-        filename = 'nparc_nscontrol_{}_Jan2025.csv'.format(nonseno_nospace)
+        filename = 'nparc_nscontrol_{}_Jan2026.csv'.format(nonseno_nospace)
         filepath = outdir / filename
         nstable.to_csv(filepath)
         ns_sig = nstable.loc[nstable['bh_pval'] < 0.05, :]
@@ -373,19 +378,19 @@ def main(datapath=None, candidatepath=None, outdir=None):
         cond_nospace = condition.replace(" ", "_")
         cond_table = table.loc[table['Treatment 1'] == condition, :].copy()
         cond_table.loc[:, 'bh_pval'] = stats.false_discovery_control(cond_table['pvalue'])
-        filename = 'nparc_{}_Jan2025.csv'.format(cond_nospace)
+        filename = 'nparc_{}_Jan2026.csv'.format(cond_nospace)
         filepath = outdir / filename
         cond_table.to_csv(filepath)
         sig_table = cond_table.loc[cond_table['bh_pval'] < 0.05, :]
-        sigfilename = 'nparc_sig_{}_Jan2025.csv'.format(cond_nospace)
+        sigfilename = 'nparc_sig_{}_Jan2026.csv'.format(cond_nospace)
         sigpath = outdir / sigfilename
         sig_table.to_csv(sigpath)
         unshared = sig_table.loc[~sig_table['PG.Genes'].isin(ns_genes), :]
-        unshare_filename = 'nparc_unshare_{}_Jan2025.csv'.format(cond_nospace)
+        unshare_filename = 'nparc_unshare_{}_Jan2026.csv'.format(cond_nospace)
         unshare_path = outdir / unshare_filename
         unshared.to_csv(unshare_path)
         
-        graphname = "nparc_Jan2025_{}.pdf".format(cond_nospace)
+        graphname = "nparc_Jan2026_{}.pdf".format(cond_nospace)
         display_graphs(graphname,
                        unshared,
                        narrow_data,
