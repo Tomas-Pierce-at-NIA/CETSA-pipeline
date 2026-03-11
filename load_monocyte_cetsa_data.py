@@ -5,16 +5,57 @@ Created on Tue Jul 16 14:02:01 2024
 @author: piercetf
 """
 
+import pathlib
+import polars as pl
 import pandas
-import seaborn
-from matplotlib import pyplot
-
-import cetsa_paths
 
 
-
-def load_candidates(candidate_path = None):
+def load_data2(data_path: pathlib.Path) -> pl.LazyFrame:
+    """loads data file from .tsv or .csv format file with
+    certain columns expected to be present.
+    Handles some aspects of intial data preparation achievable without
+    reference to other files
+    """
+    # column names expected in data file. others are allowed,
+    # but these are required
+    DATA_COLUMNS = ['PG.ProteinAccessions',
+                    'PG.Genes',
+                    'R.Condition',
+                    'R.Replicate',
+                    'FG.Quantity']
+    if data_path.suffix == '.tsv':
+        table = pl.scan_csv(data_path,
+                            separator='\t'
+                            )
+    elif data_path.suffix == '.csv':
+        table = pl.scan_csv(data_path,
+                            separator=','
+                            )
+    #extentions to support more formats would go here
+    else:
+        raise RuntimeError("format: {} not currently supported".format(data_path.suffix))
     
+    table1 = table.select(pl.col(DATA_COLUMNS))
+    # convert condition column to explicitly list temperature and treatment
+    # as different columns
+    table2 = table1.with_columns(
+        pl.col('R.Condition').str.split(' ').list.to_struct(upper_bound=2)
+        ).unnest('R.Condition')
+    table3 = table2.rename({'field_0': 'Treatment', 'field_1': 'Temperature'})
+    # numeric temperature helps later on
+    table3 = table3.cast({'Temperature': pl.Int64})
+    # mark values with missing gene name with special value
+    # missing-value issues could occur later otherwise
+    table4 = table3.select(pl.exclude('PG.Genes'), pl.col('PG.Genes').replace(None, pl.lit('GENEMISSING')))
+    return table4
+
+
+def load_candidates2(candidate_path :pathlib.Path) -> pl.LazyFrame:
+    """Load candidates file from .csv or .tsv file
+       Needed mostly to remove proteins identified from only 1 peptide.
+       Handles some aspects of the preparation which don't reference other data
+    """
+    # these column names are required
     CANDIDATE_COLUMNS = ['Condition Numerator',
                          'Condition Denominator',
                          'ProteinGroups',
@@ -22,260 +63,148 @@ def load_candidates(candidate_path = None):
                          'ProteinDescriptions',
                          'Genes',
                          'UniProtIds',
-                         '# Unique Total Peptides',
-                         'GO Biological Process',
-                         'GO Molecular Function',
-                         'GO Cellular Component']
-    
-    
-    if candidate_path is None:
-        cached_path = cetsa_paths.get_candidates_filepath(True)
-        canon_path = cetsa_paths.get_candidates_filepath(False)
-    
+                         '# Unique Total Peptides']
+    if candidate_path.suffix == '.tsv':
+        table = pl.scan_csv(candidate_path,
+                            separator='\t')
+    elif candidate_path.suffix == '.csv':
+        table = pl.scan_csv(candidate_path,
+                            separator=',')
     else:
-        cached_path = candidate_path
-        canon_path = candidate_path
-    
-    try:
-        candidates = pandas.read_csv(cached_path, 
-                                     sep='\t',
-                                     usecols=CANDIDATE_COLUMNS,
-                                     engine='pyarrow')
-    except Exception as e:
-        print("Trying to load cached version failed, falling back to canonical path")
-        print("Relevant error was: {}".format(e))
-        candidates = pandas.read_csv(canon_path, 
-                                     sep='\t',
-                                     usecols=CANDIDATE_COLUMNS)
-    
-    return candidates
+        msg = "format: {} not currenlty supported".format(candidate_path.suffix)
+        raise RuntimeError(msg)
 
-
-def load_basedata(data_path = None):
-    
-    DATA_COLUMNS = ['PG.ProteinAccessions',
-                    'PG.Genes',
-                    'R.Condition',
-                    'R.Replicate',
-                    'FG.Quantity']
-    
-    if data_path is None:
-        cached_path = cetsa_paths.get_data_filepath(True)
-        canon_path = cetsa_paths.get_data_filepath(False)
-    
-    else:
-        cached_path = data_path
-        canon_path = data_path
-    
-    try:
-        basedata = pandas.read_csv(cached_path, 
-                                   sep='\t',
-                                   usecols=DATA_COLUMNS,
-                                   engine='pyarrow')
-    except Exception as e:
-        print("Trying to load cached version failed, falling back to canonical path")
-        print("Relevant error was: {}".format(e))
-        basedata = pandas.read_csv(canon_path, 
-                                   sep='\t',
-                                   usecols=DATA_COLUMNS)
-    
-    # custom string is more accurate and avoids NaN-based pathology
-    # later on
-    basedata['PG.Genes'] = basedata['PG.Genes'].fillna('GENEMISSING')
-    return basedata
-
-def remove_unipeptides(data_table, candidate_table) -> (pandas.DataFrame, pandas.DataFrame):
-    """ Remove proteins identified by only 1 unique peptide from both the
-    data table and the candidates table.
-    Returns the results in the same order as the parameters.
-    """
-    
-    multipeptide_idx = candidate_table['# Unique Total Peptides'] > 1
-    multipeptide_candidates = candidate_table.loc[multipeptide_idx, :]
-    multipeptide_ids = set(multipeptide_candidates['UniProtIds'])
-    multipeptide_data_idx = data_table['PG.ProteinAccessions'].isin(multipeptide_ids)
-    multipeptide_data_table = data_table.loc[multipeptide_data_idx, :]
-    return multipeptide_data_table, multipeptide_candidates
-
-def remove_deprecated_columns(table):
-    colnames = list(table.columns)
-    for cname in colnames:
-        if cname.startswith('[DEPRECATED]'):
-            del table[cname]
-
-
-
-def rename_special_columns(candidate_table):
-    """take a prior table as input and produce a new table,
-    where variables with special characters have been renamed to
-    prevent the potential for problems.
-    """
-    return candidate_table.rename(columns={
-        "# of Ratios" : "Number_of_Ratios",
-        "% Change" : "Percent_Change",
-        "# Unique Total Peptides" : "Number_Unique_Total_Peptides",
-        "# Unique Total EG.Id" : "Number_Unique_Total_EGid"
+    table1 = table.select(pl.col(CANDIDATE_COLUMNS))
+    # remove proteins identified by only 1 peptide
+    table2 = table1.filter(pl.col('# Unique Total Peptides') > 1)
+    # special characters could cause problems
+    table3 = table2.rename({
+        "# Unique Total Peptides" : "Number_Unique_Total_Peptides"
         })
 
+    # getting temperature and treatment information from numerator and
+    # denominator. may be a hold-over from the previous project that
+    # used a different analysis strategy, which is also why there is
+    # an explicity restriction of the candidates to same-temperature
+    # comparisons.
+    table4 = table3.with_columns(
+        pl.col('Condition Numerator').str.split(' ').list.to_struct(upper_bound=2)
+        ).unnest(pl.col('Condition Numerator'), separator="::")
+    table5 = table4.rename({'Condition Numerator::field_0': 'Treatment_Numerator',
+                            'Condition Numerator::field_1': 'Temperature_Numerator'
+                            })
+    table6 = table5.with_columns(
+        pl.col('Condition Denominator').str.split(' ').list.to_struct(upper_bound=2)
+        ).unnest(pl.col('Condition Denominator'), separator="::")
+    table7 = table6.rename({'Condition Denominator::field_0': 'Treatment_Denominator',
+                            'Condition Denominator::field_1': 'Temperature_Denominator'
+                            })
+    table8 = table7.filter(pl.col('Temperature_Numerator').eq(pl.col('Temperature_Denominator')))
+    
+    return table8
 
-
-def load_data(data_path = None, candidate_path = None):
-    """Load in data and perform filtering and data processing steps
+def filt_data_unipep(lz_data :pl.LazyFrame, lz_candidates :pl.LazyFrame) -> pl.LazyFrame:
+    """Uses a candidates frame to remove proteins not in those candidates from the data.
+       Utility is to remove proteins which are only identified by 1 peptide from the data,
+       hence the name.
     """
-    basedata = load_basedata(data_path)
-    candidates = load_candidates(candidate_path)
-    
-    multipep_data, multipep_candidates = remove_unipeptides(basedata, candidates)
-    
-    # unneeded because we only load in columns we actually use
-    # remove_deprecated_columns(multipep_candidates)
-    
-    # remove this column by not loading it to begin with
-    #del multipep_candidates['Valid'] # don't know, based on template
-    
-    # add aliases for variables to avoid problems with special characters
-    multipep_candidates = rename_special_columns(multipep_candidates)
-    
-
-    
-    treat_temp_num = multipep_candidates['Condition Numerator'].str.split(
-        ' ',
-        expand=True
+    unique_uniprot = lz_candidates.select(pl.col('UniProtIds').unique())
+    joined = lz_data.join(
+        unique_uniprot,
+        how='semi', # return x if present in y is a semi-join
+        left_on=pl.col('PG.ProteinAccessions'),
+        right_on=pl.col('UniProtIds')
         )
-    
-    multipep_candidates.loc[:, 'Treatment_Numerator'] = treat_temp_num[0]
-    multipep_candidates.loc[:, 'Temperature_Numerator'] = treat_temp_num[1].astype(float)
-    
-    treat_temp_denom = multipep_candidates['Condition Denominator'].str.split(
-        ' ',
-        expand=True)
-    multipep_candidates.loc[:, 'Treatment_Denominator'] = treat_temp_denom[0]
-    multipep_candidates.loc[:, 'Temperature_Denominator'] = treat_temp_denom[1].astype(float)
-    
-    # only consider comparisons at the same temperature
-    sametemp_multipep_candidates = multipep_candidates.loc[multipep_candidates.Temperature_Numerator == multipep_candidates.Temperature_Denominator,:].copy()
-    
-    
-    temp_ints = pandas.to_numeric(sametemp_multipep_candidates["Temperature_Numerator"])
-    sametemp_multipep_candidates['Temperature'] = temp_ints
-    
-    treat_temp_dat = multipep_data['R.Condition'].str.split(
-        ' ',
-        expand=True)
-    
-    # split out between substance and temperature 
-    # use assign to intentionally make copy
-    multipep_data = multipep_data.assign(
-        Treatment=treat_temp_dat[0],
-        Temperature=treat_temp_dat[1].astype(float)
+    return joined
+
+
+def compute_total_prot2(lz_data :pl.LazyFrame) -> pl.LazyFrame:
+    """The data file initially has quantifications for individual peptides.
+       To conver that into a quantification for each protein, we simply
+       sum the quantifications for peptides corresponding to a protein
+       within each experimental condition.
+    """
+    grouped = lz_data.group_by(['PG.ProteinAccessions',
+                                'PG.Genes',
+                                'R.Replicate',
+                                'Treatment',
+                                'Temperature']
+                               )
+    return grouped.sum()
+
+
+def norm_prot_mintemp2(lz_data :pl.LazyFrame, use_avg=False) -> pl.LazyFrame:
+    """Normalize each protein against the level of that protein against the
+       lowest temperature quantified. Will either normalize within replicates
+       if use_avg == False or normalize against mean of lowest-temperature
+       replicates if use_avg == True. 
+    """
+    mintemp = lz_data.filter(
+        pl.col('Temperature') == pl.col('Temperature').min()
         )
-    
-    return multipep_data, sametemp_multipep_candidates
-
-def calc_total_protein_quantity(peptide_data):
-    """Total the amount of material observed per-protein identification"""
-    grouped = peptide_data.groupby(by=['PG.ProteinAccessions', 
-                                     'PG.Genes', 
-                                     'R.Replicate',
-                                     'Treatment',
-                                     'Temperature'])
-    
-    # I believe this is the total protein quantity
-    summed = grouped[['FG.Quantity']].transform("sum")
-    peptide_data.loc[:, 'Total_FG_Quantity'] = summed['FG.Quantity']
-    
-
-
-def display_counts(data):
-    """display the number of tested temperature and number of detected proteins
-    as a function of the replicate and treatment"""
-    itemcounts = data.groupby(
-        by=["R.Replicate", "Treatment"]
-        ).nunique().loc[:,["PG.ProteinAccessions", "Temperature"]].reset_index()
-    print(itemcounts)
-    itemcounts['R.Replicate'] = itemcounts['R.Replicate'].astype(str)
-    seaborn.barplot(data=itemcounts, 
-                    x="Treatment", 
-                    y="Temperature", 
-                    hue="R.Replicate"
-                    )
-    pyplot.ylabel("Number of Temperatures tested")
-    fig = pyplot.gcf()
-    pyplot.show(block=False)
-    pyplot.pause(2.0)
-    pyplot.close(fig)
-    
-    seaborn.barplot(data=itemcounts,
-                    x="Treatment",
-                    y="PG.ProteinAccessions",
-                    hue="R.Replicate"
-                    )
-    pyplot.ylabel("Number of detected proteins")
-    
-    fig = pyplot.gcf()
-    pyplot.show(block=False)
-    pyplot.pause(2.0)
-    pyplot.close(fig)
+    mintemp = mintemp.select(
+        pl.exclude(['FG.Quantity', 'Temperature']),
+        pl.col('FG.Quantity').alias('MinTempQuant')
+        )
+    if use_avg:
+        gmintemp = mintemp.group_by(
+            ['PG.ProteinAccessions',
+             'PG.Genes',
+             'Treatment']
+            )
+        mintemp2 = gmintemp.mean()
+        mintemp2 = mintemp2.select(
+            pl.col('PG.ProteinAccessions'),
+            pl.col('PG.Genes'),
+            pl.col('Treatment'),
+            pl.col('MinTempQuant')
+            )
+        table = lz_data.join(
+            mintemp2,
+            on=['PG.ProteinAccessions',
+                'PG.Genes',
+                'Treatment'
+                ],
+            how='inner'
+            )
+        table2 = table.with_columns(
+            Normalized_FG_Quant = pl.col('FG.Quantity') / pl.col('MinTempQuant')
+            )
+        return table2
+    else:
+        table = lz_data.join(
+            mintemp,
+            on=['PG.ProteinAccessions',
+                'PG.Genes',
+                'R.Replicate',
+                'Treatment'],
+            how='inner'
+            )
+        table2 = table.with_columns(
+            Normalized_FG_Quant = pl.col('FG.Quantity') / pl.col('MinTempQuant')
+            )
+        return table2
 
 
-def norm_protein_mintemp(data):
-    """"Normalize the protein quantity against the protein quantity observed
-    at the lowest tested temperature
+def prep_data2(data_path :pathlib.Path, candidate_path :pathlib.Path) -> tuple[pl.LazyFrame, pl.LazyFrame]:
+    """Loads data from data file and candidates file into memory as polars lazyframes,
+       before doing initial data preparation steps.
     """
-    
-    # minimum temperature data
-    mt_data = data[data['Temperature'] == min(data['Temperature'])]
-    
-    mt_groups = mt_data.groupby(by=['PG.Genes',
-                                     'PG.ProteinAccessions',
-                                     'Treatment'])
-    
-    mt_avgs = mt_groups.mean(numeric_only=True)
-    
-    mt_avgs.loc[:, 'Referent_Protein'] = mt_avgs['Total_FG_Quantity']
-    del mt_avgs['R.Replicate']
-    del mt_avgs['Temperature']
-    del mt_avgs['FG.Quantity']
-    del mt_avgs['Total_FG_Quantity']
-    
-    lowtemp = mt_avgs.reset_index()
-    
-    data2 = data.copy()
-    del data2['FG.Quantity']
-    data2 = data2.drop_duplicates()
-    
-    merged = data2.merge(lowtemp, 
-                        how='left',
-                        on=['PG.Genes',
-                            'PG.ProteinAccessions',
-                            'Treatment'],
-                        validate="m:1")
-    
-    merged.loc[:, 'Normalized_FG_Quantity'] = merged['Total_FG_Quantity'] / merged['Referent_Protein']
-    
-    return merged
-
-
-def prepare_data(display=False, data_path = None, candidate_path = None):
-    """General data loading routine, including filtering and normalization,
-    loads both data (normalized) and candidates (filtered).
-    Primary point of interaction with the loading module, all other components
-    are implementation.
-    """
-    filtered_data, filtered_candidates = load_data(data_path, candidate_path)
-    calc_total_protein_quantity(filtered_data)
-    #breakpoint()
-    if display:
-        display_counts(filtered_data)
-    
-    normalized_data = norm_protein_mintemp(filtered_data)
-    
-    normalized_data = normalized_data.dropna(subset=['Temperature', 'Normalized_FG_Quantity'])
-    
-    return normalized_data, filtered_candidates
-
+    lzdat = load_data2(data_path)
+    lzcan = load_candidates2(candidate_path)
+    lzdat = filt_data_unipep(lzdat, lzcan)
+    lzdat = compute_total_prot2(lzdat)
+    lzdat = lzdat.cast({'Temperature': pl.Int64})
+    lzdat = norm_prot_mintemp2(lzdat, True)
+    return lzdat, lzcan
 
 
 if __name__ == '__main__':
-    d,c = prepare_data()
+    import cetsa_paths
+    dpath = cetsa_paths.get_data_filepath()
+    cpath = cetsa_paths.get_candidates_filepath()
+    lzdat, lzcan = prep_data2(dpath, cpath)
+    
+    
+    
     
