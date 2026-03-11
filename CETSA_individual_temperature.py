@@ -7,8 +7,9 @@ Created on Fri Sep 13 14:47:46 2024
 Implement the individual temperature analysis method in Python
 """
 
-NORMPROT = 'Normalized_FG_Quantity'
+NORMPROT = 'Normalized_FG_Quant'
 
+import polars as pl
 from scipy import stats, integrate
 import pandas
 import numpy as np
@@ -19,8 +20,13 @@ from matplotlib import pyplot
 import load_monocyte_cetsa_data as load
 import cetsa_paths
 
+def get_conditions(lz_dat :pl.LazyFrame) -> set:
+    subtab = lz_dat.select(pl.col('Treatment').unique()).collect()
+    conds = set(subtab['Treatment'])
+    return conds
+    
 
-def get_all_student_tests(data: pandas.DataFrame) -> pandas.DataFrame:
+def get_all_student_tests(data: pl.LazyFrame) -> pandas.DataFrame:
     """
     Takes as input the normalized data of a CETSA experiment
     such that the treatment, temperature, and relative soluble fraction
@@ -34,7 +40,8 @@ def get_all_student_tests(data: pandas.DataFrame) -> pandas.DataFrame:
     Returns a datatable describing the results of the T-test for each
     protein-temperature-treatment-control combination.
     """
-    conditions = set(data['Treatment'])
+
+    conditions = get_conditions(data)
     
     params = cetsa_paths.loadparams()
     v_control = params['controls']['vehicle']
@@ -43,21 +50,24 @@ def get_all_student_tests(data: pandas.DataFrame) -> pandas.DataFrame:
     controls = [v_control, *ns_controls]
     
     treatments = conditions.difference({v_control})
-    
-    groups = data.groupby(by=['PG.ProteinAccessions',
-                              'PG.Genes'])
+
+    data2 = data.collect()
+
+    groups = data2.group_by(['PG.ProteinAccessions','PG.Genes'])
     
     student_table = []
     
     for ident, table in groups:
-        temp_gs = table.groupby(by=['Temperature'])
+        temp_gs = table.group_by('Temperature')
         for temp, subtable in temp_gs:
             for treatment in treatments:
                 for control in controls:
                     if treatment == control:
                         continue
-                    treat_sample = subtable.loc[subtable['Treatment'] == treatment, NORMPROT]
-                    control_sample = subtable.loc[subtable['Treatment'] == control, NORMPROT]
+                    treat_sample = subtable.filter(pl.col('Treatment').eq(pl.lit(treatment)))
+                    treat_sample = treat_sample[NORMPROT]
+                    control_sample = subtable.filter(pl.col('Treatment').eq(pl.lit(control)))
+                    control_sample = control_sample[NORMPROT]
                     t_test = stats.ttest_ind(treat_sample, control_sample, equal_var=True)
                     row = (*ident,
                            *temp,
@@ -202,8 +212,14 @@ def graph_all_proteins(data, all_comps, focus, filename, treatment, control):
     p_tab = focus.loc[:, ['PG.ProteinAccessions',
                           'PG.Genes',
                           'bh_pval']]
-    
-    subdata = data[data['PG.ProteinAccessions'].isin(focus['PG.ProteinAccessions'])]
+
+    focus2 = pl.from_pandas(focus).lazy()
+
+    subdata = data.join(
+        focus2.select(pl.col('PG.ProteinAccessions')),
+        on='PG.ProteinAccessions',
+        how='semi'
+        ).collect().to_pandas()
     
     subdata = subdata.merge(p_tab,
                             how='inner',
@@ -312,13 +328,13 @@ def run_analysis(data, candidates, datadir=None):
     good_combo_stats = combo_stats.dropna(subset=['combo_student_pvalue'])
     
     good_combo_stats.loc[:, 'bh_pval'] =stats.false_discovery_control(good_combo_stats['combo_student_pvalue'])
+
+    candidate_genes = candidates.select(
+        pl.col('Genes'),
+        pl.col('UniProtIds'),
+        pl.col('ProteinDescriptions')
+        ).unique().collect().to_pandas()
     
-    candidate_genes = candidates[['Genes', 
-                                  'UniProtIds', 
-                                  'ProteinDescriptions',
-                                  'GO Biological Process',
-                                  'GO Molecular Function',
-                                  'GO Cellular Component']].drop_duplicates()
     
     all_info = good_combo_stats.merge(candidate_genes,
                                       how='left',
@@ -372,7 +388,10 @@ def run_analysis(data, candidates, datadir=None):
 
 
 if __name__ == '__main__':
+
+    dpath = cetsa_paths.get_data_filepath()
+    cpath = cetsa_paths.get_candidates_filepath()
+    lzdat, lzcan = load.prep_data2(dpath, cpath)
+    results = run_analysis(lzdat, lzcan)
     
-    data, candidates = load.prepare_data(False)
-    results = run_analysis(data, candidates)
 

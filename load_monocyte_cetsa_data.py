@@ -196,6 +196,8 @@ def prep_data2(data_path :pathlib.Path, candidate_path :pathlib.Path) -> tuple[p
     lzdat = compute_total_prot2(lzdat)
     lzdat = lzdat.cast({'Temperature': pl.Int64})
     lzdat = norm_prot_mintemp2(lzdat, True)
+    lzdat = lzdat.drop_nulls(['Temperature', 'Normalized_FG_Quant'])
+    lzdat = lzdat.drop_nans(['Temperature', 'Normalized_FG_Quant'])
     return lzdat, lzcan
 
 
