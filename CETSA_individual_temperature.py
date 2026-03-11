@@ -58,7 +58,7 @@ def get_all_student_tests(data: pandas.DataFrame) -> pandas.DataFrame:
                         continue
                     treat_sample = subtable.loc[subtable['Treatment'] == treatment, NORMPROT]
                     control_sample = subtable.loc[subtable['Treatment'] == control, NORMPROT]
-                    t_test = stats.ttest_ind(treat_sample, control_sample)
+                    t_test = stats.ttest_ind(treat_sample, control_sample, equal_var=True)
                     row = (*ident,
                            *temp,
                            treatment,
