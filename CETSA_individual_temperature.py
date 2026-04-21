@@ -10,7 +10,7 @@ Implement the individual temperature analysis method in Python
 NORMPROT = 'Normalized_FG_Quant'
 
 import polars as pl
-from scipy import stats, integrate
+from scipy import stats
 import pandas
 import numpy as np
 import seaborn

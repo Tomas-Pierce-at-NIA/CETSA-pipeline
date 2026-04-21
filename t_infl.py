@@ -113,14 +113,17 @@ if __name__ == '__main__':
     import load_monocyte_cetsa_data as load
     from data_prepper import DataPreparer
     from nparc_model import ScaledNPARCModel
+    import cetsa_paths
     
-    
-    data, can = load.prepare_data()
+    lzdata, lzcan = load.prep_data2(cetsa_paths.get_data_filepath(),
+                                    cetsa_paths.get_candidates_filepath())
+    #data, can = load.prepare_data()
+    data = lzdata.collect()
     profile = cProfile.Profile()
     #profile.enable()
     i = 0
     try:
-        for gene_stuff, table in data.groupby(by=['PG.Genes']):
+        for gene_stuff, table in data.group_by(['PG.Genes']):
             if i > 200:
                 break
             try:

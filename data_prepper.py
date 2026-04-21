@@ -67,3 +67,24 @@ class DataPreparer:
         nh_data = interact_vars[:, :col_count]
         outputs = focal_data[NORMPROT].to_numpy()
         return nh_data, outputs, treatments, prot_ids
+
+
+if __name__ == '__main__':
+    import cetsa_paths
+    import load_monocyte_cetsa_data as load
+    import polars as pl
+    
+    dpath = cetsa_paths.get_data_filepath()
+    cpath = cetsa_paths.get_candidates_filepath()
+    
+    lzdat, lzcan = load.prep_data2(dpath, cpath)
+    
+    data = lzdat.collect()
+    
+    subdata = data.filter(
+        pl.col('PG.Genes').eq(pl.lit('MTREX'))
+        ).filter(
+            pl.col('Treatment').eq('Fisetin') | pl.col('Treatment').eq('DMSO')
+            )
+    
+    

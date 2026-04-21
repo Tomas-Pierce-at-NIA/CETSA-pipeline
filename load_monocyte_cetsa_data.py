@@ -7,7 +7,6 @@ Created on Tue Jul 16 14:02:01 2024
 
 import pathlib
 import polars as pl
-import pandas
 
 
 def load_data2(data_path: pathlib.Path) -> pl.LazyFrame:
@@ -206,7 +205,7 @@ if __name__ == '__main__':
     dpath = cetsa_paths.get_data_filepath()
     cpath = cetsa_paths.get_candidates_filepath()
     lzdat, lzcan = prep_data2(dpath, cpath)
-    
+    data = lzdat.collect()
     
     
     
