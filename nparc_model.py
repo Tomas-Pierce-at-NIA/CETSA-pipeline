@@ -302,16 +302,21 @@ if __name__ == '__main__':
     
     import permutation_test as ptest
     
+    import cetsa_paths
     import load_monocyte_cetsa_data as load
     from data_prepper import DataPreparer
     import time
     
-    data, can = load.prepare_data()
-    groups = data.groupby(by=['PG.ProteinAccessions', 'PG.Genes'],
-                                     sort=False)
+    #fname = cetsa_paths.data_filename()
+    #data, can = load.prepare_data()
+    data_fname = cetsa_paths.data_filename()
+    can_fname = cetsa_paths.candidate_filename()
+    lz_dat, lz_can = load.prep_data2(data_fname, can_fname)
+    data = lz_dat.collect()
+    groups = data.group_by(['PG.ProteinAccessions', 'PG.Genes'],
+                           maintain_order=False)
 
-        
-    start = time.time_ns()  
+    start = time.time_ns()
     i = 0
     for ident, table in groups:
         

@@ -5,9 +5,10 @@ Created on Tue Sep 24 15:40:56 2024
 @author: piercetf
 """
 
-from sklearn.preprocessing import OneHotEncoder, MinMaxScaler, PolynomialFeatures
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 import seaborn
-NORMPROT = 'Normalized_FG_Quantity'
+import polars as pl
+NORMPROT = 'Normalized_FG_Quant'
 
 
 class DataPreparer:
@@ -18,33 +19,36 @@ class DataPreparer:
                  'aware_poly']
     
     def __init__(self, focused_data):
-        self.onehot = OneHotEncoder()
-        self.onehot.fit(focused_data.loc[:, ['Treatment']])
+        self.onehot = OneHotEncoder(sparse_output=False).set_output(transform='polars')
+        self.onehot.fit(focused_data.select(pl.col('Treatment')))
         self.category_names = self.onehot.categories_[0]
-        self.scaler = MinMaxScaler()
+        self.scaler = MinMaxScaler().set_output(transform='polars')
         self.scaler.fit(focused_data[['Temperature']])
-        self.aware_poly = PolynomialFeatures(interaction_only=True,
-                                             include_bias=True)
 
     
     def transform(self, focused_data, category1, category2):
-        categories = self.onehot.transform(focused_data.loc[:, ['Treatment']]).toarray()
-        focused_data.loc[:, self.category_names] = categories
-        scaled_temps = self.scaler.transform(focused_data[['Temperature']])
-        focused_data.loc[:, ['ScaledTemp']] = scaled_temps
-        focal_data = focused_data[(focused_data[category1] == 1) | (focused_data[category2] == 1)]
-        treatments = focal_data['Treatment']
-        prot_ids = focal_data[['PG.ProteinAccessions', 'PG.Genes']]
-        interact_vars = self.aware_poly.fit_transform(focal_data[['ScaledTemp',
-                                                                  category1,
-                                                                  category2]])
+        my_data = focused_data.filter(
+            pl.col('Treatment').eq(category1) |
+            pl.col('Treatment').eq(category2)
+            )
+        treatment_only = my_data.select(pl.col('Treatment'))
+        categories = self.onehot.transform(treatment_only)
         
-        col_count = 6 # bias + temp + cat1 + cat2 + temp*cat1 + temp*cat2
-        #idx = np.argwhere(np.all(interact_vars[...,:] == 0, axis=0))
-        #interact_data = np.delete(interact_vars, idx, axis=1)
-        interact_data = interact_vars[:, :col_count]
-        outputs = focal_data[NORMPROT].to_numpy()
-        return interact_data, outputs, treatments, prot_ids
+        temp_only = my_data.select(pl.col('Temperature'))
+        scaled_temps = self.scaler.transform(temp_only)
+        
+        base_inputs = pl.concat([scaled_temps, categories], how='horizontal')
+        
+        interact_inputs = base_inputs.select(
+            pl.lit(1),
+            pl.col('Temperature'),
+            pl.col(f"Treatment_{category1}"),
+            pl.col(f"Treatment_{category2}"),
+            (pl.col('Temperature')*pl.col(f"Treatment_{category1}")).alias(f"Temperature Treatment_{category1}"),
+            (pl.col('Temperature')*pl.col(f"Treatment_{category2}")).alias(f"Temperature Treatment_{category2}")
+            )
+        return interact_inputs
+
     
     def palette(self):
         colors = seaborn.color_palette('hls', len(self.category_names))
@@ -53,26 +57,32 @@ class DataPreparer:
     
     
     def null_model_cols_transform(self, focused_data, category1, category2):
-        categories = self.onehot.transform(focused_data.loc[:, ['Treatment']]).toarray()
-        focused_data.loc[:, self.category_names] = categories
-        scaled_temps = self.scaler.transform(focused_data[['Temperature']])
-        focused_data.loc[:, ['ScaledTemp']] = scaled_temps
-        focal_data = focused_data[(focused_data[category1] == 1) | (focused_data[category2] == 1)]
-        treatments = focal_data['Treatment']
-        prot_ids = focal_data[['PG.ProteinAccessions', 'PG.Genes']]
-        interact_vars = self.aware_poly.fit_transform(focal_data[['ScaledTemp',
-                                                                  category1,
-                                                                  category2]])
-        col_count = 2 # bias + temp
-        nh_data = interact_vars[:, :col_count]
-        outputs = focal_data[NORMPROT].to_numpy()
-        return nh_data, outputs, treatments, prot_ids
-
+        my_data = focused_data.filter(
+            pl.col('Treatment').eq(category1) |
+            pl.col('Treatment').eq(category2)
+            )
+        treatment_only = my_data.select(pl.col('Treatment'))
+        categories = self.onehot.transform(treatment_only)
+        
+        temp_only = my_data.select(pl.col('Temperature'))
+        scaled_temps = self.scaler.transform(temp_only)
+        
+        base_inputs = pl.concat([scaled_temps, categories], how='horizontal')
+        
+        interact_inputs = base_inputs.select(
+            pl.lit(1),
+            pl.col('Temperature')
+            )
+        prot_ids = my_data.select(pl.col('PG.ProteinAccessions'),
+                                  pl.col('PG.Genes')
+                                  )
+        outputs = my_data[NORMPROT].to_numpy()
+        return interact_inputs, outputs, my_data['Treatment'], prot_ids
+    
 
 if __name__ == '__main__':
     import cetsa_paths
     import load_monocyte_cetsa_data as load
-    import polars as pl
     
     dpath = cetsa_paths.get_data_filepath()
     cpath = cetsa_paths.get_candidates_filepath()
@@ -83,8 +93,11 @@ if __name__ == '__main__':
     
     subdata = data.filter(
         pl.col('PG.Genes').eq(pl.lit('MTREX'))
-        ).filter(
-            pl.col('Treatment').eq('Fisetin') | pl.col('Treatment').eq('DMSO')
-            )
+        )
+    
+    dprep = DataPreparer(subdata)
+    
+    transformed = dprep.transform(subdata, 'Fisetin', 'DMSO')
+    null_transformed = dprep.null_model_cols_transform(subdata, 'Fisetin', 'DMSO')
     
     
