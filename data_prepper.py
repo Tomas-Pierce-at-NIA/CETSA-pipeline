@@ -47,7 +47,11 @@ class DataPreparer:
             (pl.col('Temperature')*pl.col(f"Treatment_{category1}")).alias(f"Temperature Treatment_{category1}"),
             (pl.col('Temperature')*pl.col(f"Treatment_{category2}")).alias(f"Temperature Treatment_{category2}")
             )
-        return interact_inputs
+        outputs = my_data[NORMPROT].to_numpy()
+        prot_ids = my_data.select(pl.col('PG.ProteinAccessions'),
+                                  pl.col('PG.Genes')
+                                  )
+        return interact_inputs, outputs, my_data['Treatment'], prot_ids
 
     
     def palette(self):

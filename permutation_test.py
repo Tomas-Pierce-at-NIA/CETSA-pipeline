@@ -5,9 +5,16 @@ Created on Tue Jan 21 22:02:59 2025
 @author: piercetf
 """
 
+# why not avoid cybersecurity implications
+import os
 import numpy as np
 from scipy import special, stats
 import time
+
+def _get_rand_seed():
+    b = os.urandom(8)
+    return int.from_bytes(b, 'little', signed=False)
+
 
 class PermutationTest:
     
@@ -21,7 +28,7 @@ class PermutationTest:
         self.cat2 = cat2
         self.ident = ident
         
-        self.seed = time.time_ns()
+        self.seed = _get_rand_seed()
         bitgen = np.random.SFC64(self.seed)
         self.rng = np.random.default_rng(bitgen)
         
@@ -52,8 +59,12 @@ class PermutationTest:
     
     @property 
     def data_insufficient(self):
-        totals = self.indata.sum(axis=0)
-        return totals[2] == 0 or totals[3] == 0
+        print(type(self.indata))
+        totals = self.indata.sum()
+        g1_cnt = totals.item(row=0, column=2)
+        g2_cnt = totals.item(row=0, column=3)
+        return g1_cnt == 0 or g2_cnt == 0
+
     
     @property
     def base_mse(self):
@@ -189,3 +200,8 @@ class PermutationTest:
         
         return (pval, low_bound, high_bound, 'gcd', iterations,
                 self.ident, self.cat1, self.cat2)
+
+
+if __name__ == '__main__':
+    pass
+
