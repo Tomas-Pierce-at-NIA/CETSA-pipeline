@@ -5,7 +5,7 @@ Created on Wed Aug 28 14:26:22 2024
 @author: piercetf
 """
 
-NORMPROT = 'Normalized_FG_Quantity'
+NORMPROT = 'Normalized_FG_Quant'
 N_COND = 4
 
 import itertools
@@ -32,6 +32,7 @@ import seaborn
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas
+import polars as pl
 
 from scipy import stats
 
@@ -140,30 +141,30 @@ def create_subtables(focused_data, dataprep):
             
             null_indatas, _, _, _ = dataprep.null_model_cols_transform(focused_data, cond1, cond2)
             
+            
             #breakpoint()
             
-            prots = prot_ids.reset_index()
-            reset_treat = treatdatas.reset_index()
-            reset_focused = focused_data.reset_index()
-            for prot in prots.groupby(by=['PG.ProteinAccessions', 'PG.Genes']):
-                idx = prot[1].index
-                
-                indata = indatas[idx, :]
-                outdata = outdatas[idx]
-                treatdata = reset_treat.loc[idx]
-                prot_id = prot[0]
-                prot_table = reset_focused.loc[idx]
-                
-                null_indata = null_indatas[idx, :]
+            prots = prot_ids.with_row_index()
+            
+            for protname, prottable in prots.group_by(['PG.ProteinAccessions',
+                                                       'PG.Genes']):
+                index = prottable['index']
+                indata = indatas[index, :]
+                outdata = outdatas[index]
+                treatdata = treatdatas[index]
+                null_indata = null_indatas[index, :]
+                p_table = focused_data[index,:]
+                p_id = protname[0]
                 
                 inputs.append(indata)
                 outputs.append(outdata)
                 treats.append(treatdata)
                 cond1s.append(cond1)
                 cond2s.append(cond2)
-                prot_identities.append(prot_id)
-                subtables.append(prot_table)
+                prot_identities.append(p_id)
+                subtables.append(p_table)
                 null_inputs.append(null_indata)
+
                 
         except Exception as e:
             raise e
@@ -240,20 +241,20 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             pdf.savefig(fig)
             ax.cla()     
 
-def main(datapath=None, candidatepath=None, outdir=None):
-    data, candidates = load.prepare_data(False, data_path=datapath, candidate_path=candidatepath)
-    # we will reload the candidates when we need them later
-    del candidates
-    narrow_data = data.loc[:, ['PG.ProteinAccessions',
-                                  'PG.Genes',
-                                  'R.Replicate',
-                                  'Temperature', 
-                                  'Treatment', 
-                                  NORMPROT]]
-
+def main(datapath, candidatepath, outdir):
+    lzdat, lzcan = load.prep_data2(datapath, candidatepath)
+    # we will fully load the candidates when we need them later
+    data = lzdat.collect()
+    
     #half the time gets spend on this shit in particular
     # and its critical because otherwise we get _nonsense_
-    narrow_data = narrow_data.drop_duplicates()
+    narrow_data = data.select(pl.col('PG.ProteinAccessions'),
+                              pl.col('PG.Genes'),
+                              pl.col('R.Replicate'),
+                              pl.col('Temperature'),
+                              pl.col('Treatment'),
+                              pl.col(NORMPROT)).unique()
+    
     dataprep = DataPreparer(narrow_data)
     
     prepped_info = create_subtables(narrow_data, dataprep)
@@ -405,5 +406,9 @@ def main(datapath=None, candidatepath=None, outdir=None):
                   
 
 if __name__ == '__main__':
-    alldata = main()
+    data_path = cetsa_paths.data_filename()
+    can_path = cetsa_paths.candidate_filename()
+    outdir = cetsa_paths.get_outdir()
+    alldata = main(data_path, can_path, outdir)
+    
     
