@@ -59,7 +59,6 @@ class PermutationTest:
     
     @property 
     def data_insufficient(self):
-        print(type(self.indata))
         totals = self.indata.sum()
         g1_cnt = totals.item(row=0, column=2)
         g2_cnt = totals.item(row=0, column=3)

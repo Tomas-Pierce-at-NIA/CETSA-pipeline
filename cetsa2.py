@@ -186,7 +186,12 @@ def _model_fit_task(model_inputs):
     return model
 
 def pfit_models(pool, datapieces):
-    models = pool.map(_model_fit_task, datapieces)
+    models_iter = pool.imap(_model_fit_task, datapieces, 32)
+    models = []
+    for i,m in enumerate(models_iter):
+        models.append(m)
+        print(i, m)
+    #models = pool.map(_model_fit_task, datapieces)
     return models
 
 
@@ -310,6 +315,9 @@ def main(datapath, candidatepath, outdir):
         
         print('begin perm tests')
         
+        breakpoint()
+        
+        
         perm_tests = permutation_tests(pool,
                                        models,
                                        in_datas,
@@ -319,6 +327,10 @@ def main(datapath, candidatepath, outdir):
                                        cond_rights,
                                        prot_idents)
         print("perm tests finished")
+        
+        print(perm_tests)
+        
+        assert False
         
     perm_table = pandas.DataFrame(data=perm_tests,
                                   columns=['pvalue',

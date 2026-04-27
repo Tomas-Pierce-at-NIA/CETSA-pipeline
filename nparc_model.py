@@ -14,7 +14,7 @@ from scipy import stats
 from sklearn.base import BaseEstimator
 from sklearn.utils import validation
 from sklearn.exceptions import DataConversionWarning, NotFittedError
-
+from sklearn.metrics import r2_score
 
 
 def _predict_nparc(p: float, w: np.ndarray, X: np.ndarray) -> np.ndarray:
@@ -295,8 +295,23 @@ class NullScaledModel(ScaledNPARCModel):
 def calc_bayes_factor(alt_model, null_model):
     alt_margin = AwareScaledModel.marginal_density_approx_laplace(alt_model)
     null_margin = NullScaledModel.null_marginal_density_approx_laplace(null_model)
-    return (alt_margin + 1e-20) / (null_margin + 1e-20)
+    return (alt_margin + 1e-20) / (null_margin + 1e-20) 
 
+
+def compute_local_cohen_f2(complex_model, null_model, complex_inputs, null_inputs, out):
+    """
+    calculate local Cohen's f2 measure of effect size based on
+    R2 metric of model `complex_model` 
+    aware of all covariates of interest `complex_inputs`
+    as compared to R2 metric of model `null_model`
+    aware only of basic covariates `null_inputs`
+    as compared to real results `out`
+    """
+    complex_pred = complex_model.predict(complex_inputs)
+    null_pred = null_model.predict(null_inputs)
+    complex_r2 = r2_score(out, complex_pred)
+    null_r2 = r2_score(out, null_pred)
+    return (complex_r2 - null_r2) / (1 - complex_r2)
 
 if __name__ == '__main__':
     
@@ -325,6 +340,7 @@ if __name__ == '__main__':
         dprep = DataPreparer(table)
         try:
             ins, outs, treats, _protids = dprep.transform(table, 'Quercetin', 'DMSO')
+            null_ins, null_outs, null_treats, _null_protids = dprep.null_model_cols_transform(table, 'Quercetin', 'DMSO')
         except KeyError:
             i -= 1
             continue
@@ -336,6 +352,19 @@ if __name__ == '__main__':
         model = ScaledNPARCModel(alpha=1e-6)
         model.fit(ins, outs)
         pds = model.predict(ins)
+        
+        null_model = ScaledNPARCModel(alpha=1e-6)
+        null_model.fit(null_ins, null_outs)
+        null_pds = null_model.predict(null_ins)
+        
+        cohen_f2 = compute_local_cohen_f2(model,
+                                          null_model,
+                                          ins,
+                                          null_ins,
+                                          outs)
+        
+        #assert False
+        
         #rng = np.random.default_rng((start + i % 97))
         i += 1
         perm_test = ptest.PermutationTest(model,
@@ -352,4 +381,5 @@ if __name__ == '__main__':
         
         print(i)
         print(test)
+        print(cohen_f2)
 
