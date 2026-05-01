@@ -17,7 +17,7 @@ import pathlib
 
 
 from data_prepper import DataPreparer
-from nparc_model import ScaledNPARCModel, calc_bayes_factor
+from nparc_model import ScaledNPARCModel, calc_bayes_factor, compute_local_cohen_f2
 import load_monocyte_cetsa_data as load
 import cetsa_paths
 import t_infl
@@ -73,7 +73,7 @@ def permutation_tests(pool, models, intables, outcols, treatinfo, cats1, cats2, 
     pvalues_iter = pool.imap_unordered(
         _perm_test_w, 
         input_data,
-        1024)
+        32)
     for row in pvalues_iter:
         pvals.append(row)
         print(row)
@@ -244,7 +244,29 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             ax.set_ylabel("Relative Soluble Protein")
             fig = ax.get_figure()
             pdf.savefig(fig)
-            ax.cla()     
+            ax.cla()
+
+
+# def _cohen_helper(arg):
+#     return compute_local_cohen_f2(*arg)
+
+
+# def pcalc_cohen(pool, models, null_models, model_inputs, null_inputs, outs):
+    
+#     args = list(zip(models, null_models, model_inputs, null_inputs, outs))
+#     cohens = []
+#     cohen_iter = pool.imap(_cohen_helper,
+#                            args,
+#                            32)
+#     for cohen in cohen_iter:
+#         cohens.append(cohen)
+    
+#     return cohens
+
+
+def bf_helper(pair):
+    return calc_bayes_factor(*pair)
+
 
 def main(datapath, candidatepath, outdir):
     lzdat, lzcan = load.prep_data2(datapath, candidatepath)
@@ -281,9 +303,30 @@ def main(datapath, candidatepath, outdir):
         print("null models ready")
         
         print("begin calculating bayes factors")
-        bfactors = [calc_bayes_factor(alt, null) for alt, null in zip(models, null_models)]
+        
+        model_pairs = list(zip(models, null_models))
+        bfactors_iter = pool.imap(bf_helper,
+                                  model_pairs,
+                                  32)
+        bfactors = []
+        for bf in bfactors_iter:
+            bfactors.append(bf)
         print("bayes factors ready")
         
+        print("Started calculating cohen f2")
+        
+        
+        cohens_f2 = []
+        for i in range(len(models)):
+            f2 = compute_local_cohen_f2(models[i],
+                                        null_models[i],
+                                        in_datas[i],
+                                        null_inputs[i],
+                                        out_datas[i])
+            print(i, f2)
+            cohens_f2.append(f2)
+        
+        print("Finished calculating cohen f2")
         
         print('started calculating inflection')
         t1_inflects = pool.map(t_infl.get_T1_inflection, models)
@@ -315,8 +358,6 @@ def main(datapath, candidatepath, outdir):
         
         print('begin perm tests')
         
-        breakpoint()
-        
         
         perm_tests = permutation_tests(pool,
                                        models,
@@ -328,10 +369,7 @@ def main(datapath, candidatepath, outdir):
                                        prot_idents)
         print("perm tests finished")
         
-        print(perm_tests)
-        
-        assert False
-        
+    
     perm_table = pandas.DataFrame(data=perm_tests,
                                   columns=['pvalue',
                                            'pvalue_lowbound',
@@ -341,6 +379,8 @@ def main(datapath, candidatepath, outdir):
                                            'ident',
                                            'Treatment 1',
                                            'Treatment 2'])
+    
+    perm_table.loc[:, 'Cohen f2'] = cohens_f2
     
     perm_table.loc[:, 'PG.ProteinAccessions'] = perm_table['ident'].map(lambda x : x[0])
     perm_table.loc[:, 'PG.Genes'] = perm_table['ident'].map(lambda x : x[1])
