@@ -208,8 +208,10 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             treatment1 = sig_table.loc[idx, 'Treatment 1']
             treatment2 = sig_table.loc[idx, 'Treatment 2']
             
-            subdata = data_table.loc[(data_table['PG.ProteinAccessions'] == acc) & (data_table['PG.Genes'] == gene),:]
-            subdata = subdata.loc[subdata['Treatment'].isin([treatment1,treatment2])]
+            #subdata = data_table.loc[(data_table['PG.ProteinAccessions'] == acc) & (data_table['PG.Genes'] == gene),:]
+            subdata = data_table.filter((data_table['PG.ProteinAccessions'] == acc) & (data_table['PG.Genes'] == gene))
+            #subdata = subdata.loc[subdata['Treatment'].isin([treatment1,treatment2])]
+            subdata = subdata.filter(subdata['Treatment'].is_in([treatment1,treatment2]))
             
             ins, outs, treats, _protids = dataprep.transform(subdata, treatment1, treatment2)
             
@@ -391,10 +393,6 @@ def main(datapath, candidatepath, outdir):
                                  'PG.Genes',
                                  'Treatment 1',
                                  'Treatment 2'])
-    
-    #data2, candidates = load.prepare_data
-    data2, candidates2 = load.prepare_data(False, datapath, candidatepath)
-    del data2
     
     
     if outdir is None:
