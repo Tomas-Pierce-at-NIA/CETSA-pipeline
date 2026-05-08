@@ -146,7 +146,7 @@ def create_subtables(focused_data, dataprep):
             
             prots = prot_ids.with_row_index()
             
-            for protname, prottable in prots.group_by(['PG.ProteinAccessions',
+            for p_id, prottable in prots.group_by(['PG.ProteinAccessions',
                                                        'PG.Genes']):
                 index = prottable['index']
                 indata = indatas[index, :]
@@ -154,13 +154,14 @@ def create_subtables(focused_data, dataprep):
                 treatdata = treatdatas[index]
                 null_indata = null_indatas[index, :]
                 p_table = focused_data[index,:]
-                p_id = protname[0]
+                #p_id = protname[0]
                 
                 inputs.append(indata)
                 outputs.append(outdata)
                 treats.append(treatdata)
                 cond1s.append(cond1)
                 cond2s.append(cond2)
+                # user code expects pairs
                 prot_identities.append(p_id)
                 subtables.append(p_table)
                 null_inputs.append(null_indata)
@@ -213,7 +214,10 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             #subdata = subdata.loc[subdata['Treatment'].isin([treatment1,treatment2])]
             subdata = subdata.filter(subdata['Treatment'].is_in([treatment1,treatment2]))
             
-            ins, outs, treats, _protids = dataprep.transform(subdata, treatment1, treatment2)
+            try:
+                ins, outs, treats, _protids = dataprep.transform(subdata, treatment1, treatment2)
+            except ValueError as ve:
+                breakpoint()
             
             hypo = pandas.DataFrame({'Temperature' : list(range(37,71)) * 2,
                                      'Treatment': [treatment1] * (71 - 37) + [treatment2] * (71-37),
