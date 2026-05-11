@@ -219,7 +219,7 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             except ValueError as ve:
                 breakpoint()
             
-            hypo = pandas.DataFrame({'Temperature' : list(range(37,71)) * 2,
+            hypo = pl.from_dict({'Temperature' : list(range(37,71)) * 2,
                                      'Treatment': [treatment1] * (71 - 37) + [treatment2] * (71-37),
                                      NORMPROT: [0.0] * (2 * (71 - 37)),
                                      'PG.ProteinAccessions' : [''] * (2 * (71 - 37)),
