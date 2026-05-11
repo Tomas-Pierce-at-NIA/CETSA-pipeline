@@ -227,7 +227,7 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             
             seaborn.scatterplot(subdata,
                                 x='Temperature',
-                                y='Normalized_FG_Quantity',
+                                y=NORMPROT,
                                 hue='Treatment',
                                 style='Treatment',
                                 ax=ax,
