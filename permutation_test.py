@@ -119,6 +119,7 @@ class PermutationTest:
         for i in range(500):
             self.permute()
             perm_pred = self.model.predict(self.working)
+            #breakpoint()
             neg_mse = -self.scaled_logit_mse(perm_pred, self.outdata)
             if neg_mse >= neg_base_mse:
                 better_count += 1
@@ -132,6 +133,7 @@ class PermutationTest:
             return (False,)
     
     def permutation_test(self, n: int=50_000):
+        #breakpoint()
         if self.data_insufficient:
             return self.data_insufficient_row()
         
@@ -202,5 +204,40 @@ class PermutationTest:
 
 
 if __name__ == '__main__':
-    pass
+    
+    import cetsa_paths
+    import load_monocyte_cetsa_data as load
+    from data_prepper import DataPreparer
+    import nparc_model as nparc
+    import polars as pl
+    
+    data_fname = cetsa_paths.data_filename()
+    can_fname = cetsa_paths.candidate_filename()
+    lz_dat, lz_can = load.prep_data2(data_fname, can_fname)
+    data = lz_dat.collect()
+    
+    dprep = DataPreparer(data)
+    
+    ins, outs, treats, _protids = dprep.transform(data, 'Quercetin', 'Myricetin')
+    
+    mask = (_protids['PG.Genes'] == 'CD38')
+    
+    ins_m = ins.filter(mask)
+    outs_m = outs[mask]
+    treats_m = treats.filter(mask)
+    
+    model = nparc.ScaledNPARCModel()
+    model.fit(ins_m, outs_m)
+    
+    ptest = PermutationTest(model,
+                            ins_m,
+                            outs_m,
+                            treats_m,
+                            'Quercetin',
+                            'Myricetin',
+                            'CD38')
+    
+    res = ptest.permutation_test()
+    
+    print(res)
 

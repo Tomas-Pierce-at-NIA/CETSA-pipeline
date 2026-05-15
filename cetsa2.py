@@ -214,10 +214,7 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             #subdata = subdata.loc[subdata['Treatment'].isin([treatment1,treatment2])]
             subdata = subdata.filter(subdata['Treatment'].is_in([treatment1,treatment2]))
             
-            try:
-                ins, outs, treats, _protids = dataprep.transform(subdata, treatment1, treatment2)
-            except ValueError as ve:
-                breakpoint()
+            ins, outs, treats, _protids = dataprep.transform(subdata, treatment1, treatment2)
             
             hypo = pl.from_dict({'Temperature' : list(range(37,71)) * 2,
                                      'Treatment': [treatment1] * (71 - 37) + [treatment2] * (71-37),
