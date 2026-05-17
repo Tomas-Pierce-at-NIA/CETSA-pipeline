@@ -6,14 +6,13 @@ Created on Tue Jan 21 22:02:59 2025
 """
 
 # why not avoid cybersecurity implications
-import os
+#import os
 import numpy as np
 from scipy import special, stats
-import time
 
-def _get_rand_seed():
-    b = os.urandom(8)
-    return int.from_bytes(b, 'little', signed=False)
+# def _get_rand_seed():
+#     b = os.urandom(8)
+#     return int.from_bytes(b, 'little', signed=False)
 
 
 class PermutationTest:
@@ -28,11 +27,9 @@ class PermutationTest:
         self.cat2 = cat2
         self.ident = ident
         
-        self.seed = _get_rand_seed()
-        bitgen = np.random.SFC64(self.seed)
-        self.rng = np.random.default_rng(bitgen)
+        self.rng = np.random.default_rng()
         
-        self.working = np.copy(indata)
+        self.working = indata.to_numpy()
         
         self.y_max = np.max(outdata)
         
@@ -44,16 +41,25 @@ class PermutationTest:
     def permute(self):
         # randomly permute the category assignments in place in the working copy
         #self.rng.shuffle(self.working[:,2])
-        
-        blank = np.empty_like(self.working)
-        blank[:,[0,1]] = self.working[:, [0,1]]
-        cat1_permuted = self.rng.permutation(self.working[:,2])
-        blank[:, 2] = cat1_permuted
-        blank[:, 3] = 1 - cat1_permuted
-        blank[:,4] = blank[:,1] * blank[:,2]
-        blank[:,5] = blank[:,1] * blank[:,3]
-        
-        self.working = blank
+        # have to change because changed other aspects of the implementation
+        working_np = np.copy(self.working)
+        # what new order should be set
+        permutation = self.rng.permutation(len(working_np))
+        # which columns should be re-ordered
+        permutable = working_np[:, [1,2]]
+        # treatments are randomly reassinged by permuting
+        permuted_treatments = permutable[permutation]
+        # temperature is not reassigned
+        temp_var = working_np[:, [0]]
+        # temperature*treatment products must now be recomputed
+        interact_vars = temp_var * permuted_treatments
+        # recombine
+        permuted_treatment_data = np.concat([temp_var,
+                                             permuted_treatments,
+                                             interact_vars],
+                                            axis=1)
+        self.working = permuted_treatment_data
+        return permuted_treatment_data
         
     
     
@@ -69,7 +75,8 @@ class PermutationTest:
     def base_mse(self):
         if self.__base_mse is None:
             base_pred = self.model.predict(self.indata)
-            self.__base_mse = self.scaled_logit_mse(base_pred, self.outdata)
+            self.__base_mse = PermutationTest.mse(base_pred, self.outdata)
+            #self.__base_mse = self.scaled_logit_mse(base_pred, self.outdata)
         
         return self.__base_mse
     
@@ -113,33 +120,10 @@ class PermutationTest:
         return mse
     
     
-    def fast_ecdf(self):
-        neg_base_mse = -self.base_mse
-        better_count = 0
-        for i in range(500):
-            self.permute()
-            perm_pred = self.model.predict(self.working)
-            #breakpoint()
-            neg_mse = -self.scaled_logit_mse(perm_pred, self.outdata)
-            if neg_mse >= neg_base_mse:
-                better_count += 1
-        pval = (better_count + 1) / 501
-        if pval > 0.1:
-            pvar = pval * (1 - pval) / 500
-            interval = stats.norm.interval(0.95, pval, pvar)
-            return (pval, *interval, 'ecdf-faststop', 
-                    -1, self.ident, self.cat1, self.cat2)
-        else:
-            return (False,)
-    
     def permutation_test(self, n: int=50_000):
         #breakpoint()
         if self.data_insufficient:
             return self.data_insufficient_row()
-        
-        fast = self.fast_ecdf()
-        if fast[0] > 0.2:
-            return fast
         
         neg_base_mse = -self.base_mse
         better_count = 0
@@ -149,9 +133,19 @@ class PermutationTest:
             self.permute()
             perm_pred = self.model.predict(self.working)
             neg_mse = -self.scaled_logit_mse(perm_pred, self.outdata)
+            # if mse <= base_mse:
             if neg_mse >= neg_base_mse:
+                # count # of times model performance is not worse
+                # under permutation of drug ID
                 better_count += 1
             mmts[i] = neg_mse
+        
+        # if under treatment permutation, model perf is usually as good or better
+        # then treatment is probably not important, so null hypothesis
+        # so p-value should be high
+        # if under treatment permutation, model perf is usually worse
+        # then treatment is probably important, so alt hypothesis
+        # so p-value should be low
         
         if better_count >= 10:
             pval = (better_count + 1) / (n + 1)
@@ -209,7 +203,6 @@ if __name__ == '__main__':
     import load_monocyte_cetsa_data as load
     from data_prepper import DataPreparer
     import nparc_model as nparc
-    import polars as pl
     
     data_fname = cetsa_paths.data_filename()
     can_fname = cetsa_paths.candidate_filename()

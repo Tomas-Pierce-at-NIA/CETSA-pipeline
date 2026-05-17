@@ -40,7 +40,7 @@ class DataPreparer:
         base_inputs = pl.concat([scaled_temps, categories], how='horizontal')
         
         interact_inputs = base_inputs.select(
-            pl.lit(1),
+            # including a shared bias competes with treatment category biases
             pl.col('Temperature'),
             pl.col(f"Treatment_{category1}"),
             pl.col(f"Treatment_{category2}"),
