@@ -250,21 +250,6 @@ def display_graphs(filename, sig_table, data_table, dataprep, palette=None, outd
             ax.cla()
 
 
-# def _cohen_helper(arg):
-#     return compute_local_cohen_f2(*arg)
-
-
-# def pcalc_cohen(pool, models, null_models, model_inputs, null_inputs, outs):
-    
-#     args = list(zip(models, null_models, model_inputs, null_inputs, outs))
-#     cohens = []
-#     cohen_iter = pool.imap(_cohen_helper,
-#                            args,
-#                            32)
-#     for cohen in cohen_iter:
-#         cohens.append(cohen)
-    
-#     return cohens
 
 
 def bf_helper(pair):
@@ -305,16 +290,7 @@ def main(datapath, candidatepath, outdir):
         null_models = pfit_models(pool, nullmodel_inputs)
         print("null models ready")
         
-        print("begin calculating bayes factors")
-        
-        model_pairs = list(zip(models, null_models))
-        bfactors_iter = pool.imap(bf_helper,
-                                  model_pairs,
-                                  32)
-        bfactors = []
-        for bf in bfactors_iter:
-            bfactors.append(bf)
-        print("bayes factors ready")
+
         
         print("Started calculating cohen f2")
         
@@ -338,9 +314,9 @@ def main(datapath, candidatepath, outdir):
         #datatable.loc[:, 'T_infl_Treatment_2'] = t2_inflects
         print('finished calculating inflection')
         
-        print("start calculating delta auc")
-        delta_auc = pool.map(t_infl.get_delta_s, models)
-        print("finish calculating delta auc")
+        #print("start calculating delta auc")
+        #delta_auc = pool.map(t_infl.get_delta_s, models)
+        #print("finish calculating delta auc")
         
         prot_accessions = [p[0] for p in prot_idents]
         gene_ids = [p[1] for p in prot_idents]
@@ -350,14 +326,14 @@ def main(datapath, candidatepath, outdir):
                                       'Treatment 2': cond_rights,
                                       'model': models,
                                       'T_infl_Treatment_1' : t1_inflects,
-                                      'T_infl_Treatment_2' : t2_inflects,
-                                      'Bayes_factors': bfactors,
-                                      'Delta AUC': delta_auc})
+                                      'T_infl_Treatment_2' : t2_inflects})
+                                      #'Bayes_factors': bfactors,
+                                      #'Delta AUC': delta_auc})
         
         datatable.loc[:,'converged'] = datatable['model'].map(lambda m : m.fit_success_)
         
-        datatable.loc[:, 'T1_Decreasing'] = datatable['model'].map(lambda m : m.treatment1_decreasing)
-        datatable.loc[:, 'T2_Decreasing'] = datatable['model'].map(lambda m : m.treatment2_decreasing)
+        #datatable.loc[:, 'T1_Decreasing'] = datatable['model'].map(lambda m : m.treatment1_decreasing)
+        #datatable.loc[:, 'T2_Decreasing'] = datatable['model'].map(lambda m : m.treatment2_decreasing)
         
         print('begin perm tests')
         
@@ -402,7 +378,7 @@ def main(datapath, candidatepath, outdir):
     
     
     table.loc[:, 'bh_pval'] = stats.false_discovery_control(table['pvalue'])
-    table.to_csv(outdir / 'nparc_outputs_Oct2024.csv')
+    table.to_csv(outdir / 'nparc_outputs_May2026.csv')
     
     conditions = table['Treatment 1'].unique()
     
@@ -417,7 +393,7 @@ def main(datapath, candidatepath, outdir):
         nonseno_nospace = non_seno.replace(' ', '_')
         nstable = table.loc[table['Treatment 1'] == non_seno, :].copy()
         nstable.loc[:, 'bh_pval'] = stats.false_discovery_control(nstable['pvalue'])
-        filename = 'nparc_nscontrol_{}_Jan2026.csv'.format(nonseno_nospace)
+        filename = 'nparc_nscontrol_{}_May2026.csv'.format(nonseno_nospace)
         filepath = outdir / filename
         nstable.to_csv(filepath)
         ns_sig = nstable.loc[nstable['bh_pval'] < 0.05, :]
@@ -430,19 +406,19 @@ def main(datapath, candidatepath, outdir):
         cond_nospace = condition.replace(" ", "_")
         cond_table = table.loc[table['Treatment 1'] == condition, :].copy()
         cond_table.loc[:, 'bh_pval'] = stats.false_discovery_control(cond_table['pvalue'])
-        filename = 'nparc_{}_Jan2026.csv'.format(cond_nospace)
+        filename = 'nparc_{}_May2026.csv'.format(cond_nospace)
         filepath = outdir / filename
         cond_table.to_csv(filepath)
         sig_table = cond_table.loc[cond_table['bh_pval'] < 0.05, :]
-        sigfilename = 'nparc_sig_{}_Jan2026.csv'.format(cond_nospace)
+        sigfilename = 'nparc_sig_{}_May2026.csv'.format(cond_nospace)
         sigpath = outdir / sigfilename
         sig_table.to_csv(sigpath)
         unshared = sig_table.loc[~sig_table['PG.Genes'].isin(ns_genes), :]
-        unshare_filename = 'nparc_unshare_{}_Jan2026.csv'.format(cond_nospace)
+        unshare_filename = 'nparc_unshare_{}_May2026.csv'.format(cond_nospace)
         unshare_path = outdir / unshare_filename
         unshared.to_csv(unshare_path)
         
-        graphname = "nparc_Jan2026_{}.pdf".format(cond_nospace)
+        graphname = "nparc_May2026_{}.pdf".format(cond_nospace)
         display_graphs(graphname,
                        unshared,
                        narrow_data,

@@ -176,7 +176,7 @@ class PermutationTest:
             thresh_idx += 10
             if thresh_idx >= 0:
                 p_value = (better_count + 1) / (n + 1)
-                pvar = pval * (1 - p_value) / n
+                pvar = p_value * (1 - p_value) / n
                 interval = stats.norm.interval(0.95, p_value, pvar)
                 return (p_value, *interval, 'ecdf-fallback',
                         iterations, self.ident, self.cat1, self.cat2)
