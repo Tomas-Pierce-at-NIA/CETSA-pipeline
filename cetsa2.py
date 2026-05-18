@@ -32,10 +32,9 @@ import seaborn
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas
-
 from scipy import stats
-
 import toml
+from sklearn import metrics
 
 
 RNG_SEED = time.time_ns()
@@ -321,7 +320,27 @@ def main(datapath=None, candidatepath=None, outdir=None):
     
     print("Started calculating Cohen's f2 score")
     
-    breakpoint()
+    cohen_f2_scores = []
+    
+    for i in range(len(models)):
+        aware_model = models[i]
+        null_model = null_models[i]
+        
+        aware_inputs = in_datas[i]
+        aware_predict = aware_model.predict(aware_inputs)
+        
+        null_inp = null_inputs[i]
+        null_predict = null_model.predict(null_inp)
+        
+        out_actuals = out_datas[i]
+        
+        aware_r2 = metrics.r2_score(out_actuals, aware_predict)
+        null_r2 = metrics.r2_score(out_actuals, null_predict)
+        
+        cohen_f2 = (aware_r2 - null_r2) / (1 - aware_r2)
+        
+        cohen_f2_scores.append(cohen_f2)
+    
     
     print("Finished calculating Cohen's f2 score")
         
@@ -337,6 +356,8 @@ def main(datapath=None, candidatepath=None, outdir=None):
     
     perm_table.loc[:, 'PG.ProteinAccessions'] = perm_table['ident'].map(lambda x : x[0])
     perm_table.loc[:, 'PG.Genes'] = perm_table['ident'].map(lambda x : x[1])
+    
+    perm_table.loc[:, 'Cohen f2'] = cohen_f2_scores
     
     table = datatable.merge(perm_table,
                              how='left',

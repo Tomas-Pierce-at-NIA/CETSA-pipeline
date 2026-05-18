@@ -9,7 +9,7 @@ Implement the individual temperature analysis method in Python
 
 NORMPROT = 'Normalized_FG_Quantity'
 
-from scipy import stats, integrate
+from scipy import stats
 import pandas
 import numpy as np
 import seaborn
@@ -325,13 +325,23 @@ def run_analysis(data, candidates, datadir=None):
                                       left_on=['PG.ProteinAccessions', 'PG.Genes'],
                                       right_on=['UniProtIds', 'Genes'])
     
+    effect_sizes = calc_effect_size(data)
+    
+    all_info = all_info.merge(effect_sizes, 
+                              how='left',
+                              on=['PG.ProteinAccessions',
+                                  'PG.Genes',
+                                  'Treatment',
+                                  'Control']
+                              )
+    
     sigtable = all_info.loc[all_info['bh_pval'] < 0.05, :]
     
     sigtable.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
     all_info.sort_values(by=['bh_pval'], inplace=True, kind='mergesort')
     
-    sigtable.to_csv(datadir / "ITA_signif_comps_Student_Jan2025.csv")
-    all_info.to_csv(datadir / "ITA_all_comps_Student_Jan2025.csv")
+    sigtable.to_csv(datadir / "ITA_signif_comps_Student_May2026.csv")
+    all_info.to_csv(datadir / "ITA_all_comps_Student_May2026.csv")
     
     params = cetsa_paths.loadparams()
     
@@ -352,12 +362,12 @@ def run_analysis(data, candidates, datadir=None):
         cond_nospace = condition.replace(" ", "_")
         cond_table = sigtable.loc[sigtable['Treatment'] == condition, :]
         cond_unshare = cond_table.loc[~cond_table['PG.Genes'].isin(ns_genes),:]
-        cond_fname = datadir / "ITA_un_{}_Jan2025.csv".format(cond_nospace)
+        cond_fname = datadir / "ITA_un_{}_May2026.csv".format(cond_nospace)
         cond_unshare.to_csv(cond_fname)
         
         for control in controls:
             pair_tab = cond_unshare.loc[cond_unshare['Control'] == control, :]
-            fname = datadir / "ITA_{}_v_{}_Jan2025.pdf".format(condition, 
+            fname = datadir / "ITA_{}_v_{}_May2026.pdf".format(condition, 
                                                                control)
             graph_all_proteins(data,
                                students,
@@ -365,14 +375,78 @@ def run_analysis(data, candidates, datadir=None):
                                fname,
                                condition,
                                control)
-        
+    
+    
+    seaborn.scatterplot(y=-np.log10(all_info['bh_pval']),
+                        x=all_info['Log2FC'])
+    pyplot.xlabel("Average Log2 Fold Change across temperatures")
+    pyplot.ylabel("-log10 adjusted p-value")
+    pyplot.tight_layout()
+    pyplot.savefig(datadir / "ITA_volcano_plot_May2026.pdf")
+    pyplot.show(block=False)
+    pyplot.pause(2.0)
+    pyplot.close()
     
     return all_info
-        
+
+
+# uses the average of the log fold change of means at each temperature
+# as a measure of effect size.
+def calc_effect_size(data :pandas.DataFrame):
+    #grouped = data.groupby(['PG.ProteinAccessions', 'PG.Genes'])
+    controls = cetsa_paths.loadparams()['controls']['nonsenolytic']
+    controls.append(cetsa_paths.loadparams()['controls']['vehicle'])
+    
+    groups = data.groupby(by=['PG.ProteinAccessions', 'PG.Genes'])
+    
+    rows = []
+    
+    for (ident, table) in groups:
+        by_temp = table.groupby(by='Temperature')
+        for (temp, subtable) in by_temp:
+            treatments = subtable['Treatment'].unique()
+            
+            for treat_name in treatments:
+                for control_name in controls:
+                    
+                    if treat_name == control_name:
+                        continue
+                    
+                    treat_tab = subtable[subtable['Treatment'] == treat_name]
+                    control_tab = subtable[subtable['Treatment'] == control_name]
+                    
+                    treat_mean = treat_tab[NORMPROT].mean()
+                    control_mean = control_tab[NORMPROT].mean()
+                    
+                    l2_fc = np.log2(treat_mean) - np.log2(control_mean)
+                    
+                    row = [*ident, temp, treat_name, control_name, l2_fc]
+                    
+                    rows.append(row)
+    
+    table = pandas.DataFrame(data=rows,
+                             columns=['PG.ProteinAccessions',
+                                      'PG.Genes',
+                                      'Temperature',
+                                      'Treatment',
+                                      'Control',
+                                      'Log2FC'])
+    effect_groups = table.groupby(by=['PG.ProteinAccessions',
+                                      'PG.Genes',
+                                      'Treatment',
+                                      'Control'])
+    mean_effect = effect_groups.mean()
+    
+    del mean_effect['Temperature']
+    
+    return mean_effect.reset_index()
+
+
 
 
 if __name__ == '__main__':
     
     data, candidates = load.prepare_data(False)
     results = run_analysis(data, candidates)
-
+    #effect_sizes = calc_effect_size(data)
+    
