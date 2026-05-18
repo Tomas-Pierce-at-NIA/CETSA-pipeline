@@ -221,10 +221,10 @@ class ScaledNPARCModel(NPARCModel):
     def fit(self, X :np.ndarray, y :np.ndarray):
         self.y_max_ = np.max(y)
         self.small_y_ = y / self.y_max_
-        return super().fit(X, self.small_y_)
+        return super(ScaledNPARCModel, self).fit(X, self.small_y_)
     
     def predict(self, X: np.ndarray) -> np.ndarray:
-        small_preds = super().predict(X)
+        small_preds = super(ScaledNPARCModel, self).predict(X)
         return small_preds * self.y_max_
 
 

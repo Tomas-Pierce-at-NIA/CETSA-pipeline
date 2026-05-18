@@ -23,13 +23,13 @@ t = sympy.Symbol('t', real=True)
 c1 = sympy.Symbol('c1', real=True)
 c2 = sympy.Symbol('c2', real=True)
 p = sympy.Symbol('p', real=True)
-#b0 = sympy.Symbol('b0', real=True)
+b0 = sympy.Symbol('b0', real=True)
 w_t = sympy.Symbol('w_t', real=True)
 w_c1 = sympy.Symbol('w_c1', real=True)
 w_c2 = sympy.Symbol('w_c2', real=True)
 w_tc1 = sympy.Symbol('w_tc1', real=True)
 w_tc2 = sympy.Symbol('w_tc2', real=True)
-_z = (w_t * t) + (w_c1 * c1) + (w_c2 * c2) + (w_tc1 * c1 * t) + (w_tc2 * c2 * t)
+_z = b0 + (w_t * t) + (w_c1 * c1) + (w_c2 * c2) + (w_tc1 * c1 * t) + (w_tc2 * c2 * t)
 expit = 1 / (1 + sympy.exp(-_z))
 analytic_form = expit - (p * expit) + p
 analytic_form = analytic_form.simplify()
@@ -72,11 +72,12 @@ def analytic_deriv(model :NPARCModel, treatment :int) -> Callable[[float], float
     params = model.params_
     
     substitutes = [(p, params[0]),
-                   (w_t, params[1]),
-                   (w_c1, params[2]),
-                   (w_c2, params[3]),
-                   (w_tc1, params[4]),
-                   (w_tc2, params[5])]
+                   (b0, params[1]),
+                   (w_t, params[2]),
+                   (w_c1, params[3]),
+                   (w_c2, params[4]),
+                   (w_tc1, params[5]),
+                   (w_tc2, params[6])]
     
     if treatment == 1:
         substitutes.extend([(c1, 1),
@@ -113,6 +114,7 @@ if __name__ == '__main__':
     from data_prepper import DataPreparer
     #from nparc_model import ScaledNPARCModel
     import cetsa_paths
+    import polars as pl
     
     lzdata, lzcan = load.prep_data2(cetsa_paths.get_data_filepath(),
                                     cetsa_paths.get_candidates_filepath())
@@ -130,6 +132,9 @@ if __name__ == '__main__':
                 inputs, outputs, treats, prot_ids = dprep.transform(table, 'Fisetin', 'DMSO')
                 model = ScaledNPARCModel()
                 model.fit(inputs, outputs)
+            
+            except pl.exceptions.ColumnNotFoundError:
+                continue
                 
                 #assert False
             except ValueError:
