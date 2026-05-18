@@ -318,6 +318,8 @@ def main(datapath=None, candidatepath=None, outdir=None):
                                        cond_rights,
                                        prot_idents)
         print("perm tests finished")
+    
+    breakpoint()
         
     perm_table = pandas.DataFrame(data=perm_tests,
                                   columns=['pvalue',
