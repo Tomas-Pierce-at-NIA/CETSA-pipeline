@@ -29,7 +29,7 @@ class PermutationTest:
         
         self.rng = np.random.default_rng()
         
-        self.working = indata.to_numpy()
+        self.working = np.copy(indata.to_numpy())
         
         self.y_max = np.max(outdata)
         
@@ -39,28 +39,24 @@ class PermutationTest:
     
     
     def permute(self):
-        # randomly permute the category assignments in place in the working copy
-        #self.rng.shuffle(self.working[:,2])
-        # have to change because changed other aspects of the implementation
         working_np = np.copy(self.working)
-        # what new order should be set
-        permutation = self.rng.permutation(len(working_np))
-        # which columns should be re-ordered
-        permutable = working_np[:, [1,2]]
-        # treatments are randomly reassinged by permuting
-        permuted_treatments = permutable[permutation]
-        # temperature is not reassigned
-        temp_var = working_np[:, [0]]
-        # temperature*treatment products must now be recomputed
-        interact_vars = temp_var * permuted_treatments
-        # recombine
-        permuted_treatment_data = np.concat([temp_var,
-                                             permuted_treatments,
-                                             interact_vars],
-                                            axis=1)
-        self.working = permuted_treatment_data
-        return permuted_treatment_data
-        
+        treatment_idcols = working_np[:, [2,3]]
+        # permute in place
+        self.rng.shuffle(treatment_idcols, axis=0)
+        # bias term
+        bias = np.ones(shape=[working_np.shape[0], 1])
+        # temperature term
+        temp = working_np[:, [1]]
+        # temperature treatment interaction product must be recomputed
+        interact = temp * treatment_idcols
+        # recombine items
+        permuted_data = np.concat([bias,
+                                   temp,
+                                   treatment_idcols,
+                                   interact],
+                                  axis=1)
+        self.working = permuted_data
+        return permuted_data
     
     
     @property 
@@ -75,8 +71,8 @@ class PermutationTest:
     def base_mse(self):
         if self.__base_mse is None:
             base_pred = self.model.predict(self.indata)
-            self.__base_mse = PermutationTest.mse(base_pred, self.outdata)
-            #self.__base_mse = self.scaled_logit_mse(base_pred, self.outdata)
+            #self.__base_mse = PermutationTest.mse(base_pred, self.outdata)
+            self.__base_mse = self.scaled_logit_mse(base_pred, self.outdata)
         
         return self.__base_mse
     
@@ -128,31 +124,38 @@ class PermutationTest:
         neg_base_mse = -self.base_mse
         better_count = 0
         mmts = np.empty((n,))
-        #mmts = queue.PriorityQueue(n)
+        
+        
         for i in range(n):
-            self.permute()
-            perm_pred = self.model.predict(self.working)
+            working = self.permute()
+            perm_pred = self.model.predict(working)
             neg_mse = -self.scaled_logit_mse(perm_pred, self.outdata)
-            # if mse <= base_mse:
-            if neg_mse >= neg_base_mse:
-                # count # of times model performance is not worse
-                # under permutation of drug ID
+            
+            if neg_mse > neg_base_mse:
                 better_count += 1
             mmts[i] = neg_mse
         
-        # if under treatment permutation, model perf is usually as good or better
-        # then treatment is probably not important, so null hypothesis
-        # so p-value should be high
-        # if under treatment permutation, model perf is usually worse
-        # then treatment is probably important, so alt hypothesis
-        # so p-value should be low
+        print(mmts.var())
+        #breakpoint()
+        print(better_count)
+        # make sure the problem is actually where i think
+        #pval = (better_count + 1) / (n + 1)
+        #pvar = pval * (1 - pval) / n 
+        #interval = stats.norm.interval(0.95, pval, pvar)
+        #return (pval, *interval, 'ecdf', -1, self.ident, self.cat1, self.cat2)
+        
         
         if better_count >= 10:
             pval = (better_count + 1) / (n + 1)
             pvar = pval * (1 - pval) / n
             interval = stats.norm.interval(0.95, pval, pvar)
-            return (pval, *interval, 'ecdf', -1, 
-                    self.ident, self.cat1, self.cat2)
+            return (pval, 
+                    *interval, 
+                    'ecdf', 
+                    -1, 
+                    self.ident, 
+                    self.cat1, 
+                    self.cat2)
         
         
         thresh_idx = -250
@@ -170,7 +173,7 @@ class PermutationTest:
         
         iterations = 0
         
-        
+        #breakpoint()
         while test.pvalue < 0.05:
             iterations += 1
             thresh_idx += 10
@@ -204,6 +207,8 @@ if __name__ == '__main__':
     from data_prepper import DataPreparer
     import nparc_model as nparc
     
+    TEST_PROT = 'GMPR2'
+    
     data_fname = cetsa_paths.data_filename()
     can_fname = cetsa_paths.candidate_filename()
     lz_dat, lz_can = load.prep_data2(data_fname, can_fname)
@@ -211,26 +216,41 @@ if __name__ == '__main__':
     
     dprep = DataPreparer(data)
     
-    ins, outs, treats, _protids = dprep.transform(data, 'Quercetin', 'Myricetin')
+    ins, outs, treats, _protids = dprep.transform(data, 'Fisetin', 'DMSO')
     
-    mask = (_protids['PG.Genes'] == 'CD38')
+    mask = (_protids['PG.Genes'] == TEST_PROT)
     
     ins_m = ins.filter(mask)
     outs_m = outs[mask]
     treats_m = treats.filter(mask)
     
-    model = nparc.ScaledNPARCModel()
+    model = nparc.ScaledNPARCModel(1e-8)
     model.fit(ins_m, outs_m)
     
     ptest = PermutationTest(model,
                             ins_m,
                             outs_m,
                             treats_m,
-                            'Quercetin',
-                            'Myricetin',
-                            'CD38')
+                            'Fisetin',
+                            'DMSO',
+                            TEST_PROT)
     
-    res = ptest.permutation_test()
+    permuted = ptest.permute()
+    print(permuted == ins_m)
+    
+    res = ptest.permutation_test(100_000)
     
     print(res)
-
+    
+    import polars as pl
+    import seaborn
+    from matplotlib import pyplot
+    subdata = data.filter(pl.col('PG.Genes').eq(TEST_PROT))
+    seaborn.scatterplot(
+        subdata.filter(
+            pl.col('Treatment').is_in(pl.lit(['DMSO', 'Fisetin']))
+            ).to_pandas(), 
+        x='Temperature', 
+        y='Normalized_FG_Quant', 
+        hue='Treatment')
+    pyplot.show()

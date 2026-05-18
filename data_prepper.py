@@ -41,6 +41,8 @@ class DataPreparer:
         
         interact_inputs = base_inputs.select(
             # including a shared bias competes with treatment category biases
+            # we need it anyway for permutation testing reasons
+            pl.lit(1).alias('bias'),
             pl.col('Temperature'),
             pl.col(f"Treatment_{category1}"),
             pl.col(f"Treatment_{category2}"),
