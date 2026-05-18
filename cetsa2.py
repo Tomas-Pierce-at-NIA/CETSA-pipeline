@@ -319,7 +319,11 @@ def main(datapath=None, candidatepath=None, outdir=None):
                                        prot_idents)
         print("perm tests finished")
     
+    print("Started calculating Cohen's f2 score")
+    
     breakpoint()
+    
+    print("Finished calculating Cohen's f2 score")
         
     perm_table = pandas.DataFrame(data=perm_tests,
                                   columns=['pvalue',
