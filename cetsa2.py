@@ -37,6 +37,8 @@ from scipy import stats
 
 import toml
 
+from sklearn import metrics
+
 
 RNG_SEED = time.time_ns()
 
@@ -313,6 +315,32 @@ def main(datapath=None, candidatepath=None, outdir=None):
                                        cond_rights,
                                        prot_idents)
         print("perm tests finished")
+    
+    print("begin calculating Cohen's f2 score")
+    
+    cohen_f2_scores = []
+    
+    for i in range(len(models)):
+        model_i = models[i]
+        null_model_i = null_models[i]
+        inputs_i = in_datas[i]
+        null_inputs_i = null_inputs[i]
+        out_i = out_datas[i]
+        
+        predictions_i = model_i.predict(inputs_i)
+        null_predictions_i = null_model_i.predict(null_inputs_i)
+        
+        aware_r2 = metrics.r2_score(out_i, predictions_i)
+        null_r2 = metrics.r2_score(out_i, null_predictions_i)
+        
+        cohen = (aware_r2 - null_r2) / (1 - aware_r2)
+        
+        cohen_f2_scores.append(cohen)
+        
+        print(f"{prot_idents[i]} cohen f2 {cohen}")
+    
+    
+    print("finished calculating Cohen's f2 score")
         
     perm_table = pandas.DataFrame(data=perm_tests,
                                   columns=['pvalue',
@@ -326,6 +354,8 @@ def main(datapath=None, candidatepath=None, outdir=None):
     
     perm_table.loc[:, 'PG.ProteinAccessions'] = perm_table['ident'].map(lambda x : x[0])
     perm_table.loc[:, 'PG.Genes'] = perm_table['ident'].map(lambda x : x[1])
+    
+    perm_table.loc[:, 'Cohen f2'] = cohen_f2_scores
     
     table = datatable.merge(perm_table,
                              how='left',
@@ -345,7 +375,7 @@ def main(datapath=None, candidatepath=None, outdir=None):
     
     
     table.loc[:, 'bh_pval'] = stats.false_discovery_control(table['pvalue'])
-    table.to_csv(outdir / 'nparc_outputs_Oct2024.csv')
+    table.to_csv(outdir / 'nparc_outputs_May2026.csv')
     
     conditions = table['Treatment 1'].unique()
     
@@ -360,7 +390,7 @@ def main(datapath=None, candidatepath=None, outdir=None):
         nonseno_nospace = non_seno.replace(' ', '_')
         nstable = table.loc[table['Treatment 1'] == non_seno, :].copy()
         nstable.loc[:, 'bh_pval'] = stats.false_discovery_control(nstable['pvalue'])
-        filename = 'nparc_nscontrol_{}_Jan2025.csv'.format(nonseno_nospace)
+        filename = 'nparc_nscontrol_{}_May2026.csv'.format(nonseno_nospace)
         filepath = outdir / filename
         nstable.to_csv(filepath)
         ns_sig = nstable.loc[nstable['bh_pval'] < 0.05, :]
@@ -373,19 +403,19 @@ def main(datapath=None, candidatepath=None, outdir=None):
         cond_nospace = condition.replace(" ", "_")
         cond_table = table.loc[table['Treatment 1'] == condition, :].copy()
         cond_table.loc[:, 'bh_pval'] = stats.false_discovery_control(cond_table['pvalue'])
-        filename = 'nparc_{}_Jan2025.csv'.format(cond_nospace)
+        filename = 'nparc_{}_May2026.csv'.format(cond_nospace)
         filepath = outdir / filename
         cond_table.to_csv(filepath)
         sig_table = cond_table.loc[cond_table['bh_pval'] < 0.05, :]
-        sigfilename = 'nparc_sig_{}_Jan2025.csv'.format(cond_nospace)
+        sigfilename = 'nparc_sig_{}_May2026.csv'.format(cond_nospace)
         sigpath = outdir / sigfilename
         sig_table.to_csv(sigpath)
         unshared = sig_table.loc[~sig_table['PG.Genes'].isin(ns_genes), :]
-        unshare_filename = 'nparc_unshare_{}_Jan2025.csv'.format(cond_nospace)
+        unshare_filename = 'nparc_unshare_{}_May2026.csv'.format(cond_nospace)
         unshare_path = outdir / unshare_filename
         unshared.to_csv(unshare_path)
         
-        graphname = "nparc_Jan2025_{}.pdf".format(cond_nospace)
+        graphname = "nparc_May2026_{}.pdf".format(cond_nospace)
         display_graphs(graphname,
                        unshared,
                        narrow_data,
